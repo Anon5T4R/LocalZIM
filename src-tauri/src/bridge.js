@@ -31,6 +31,10 @@
       } else if (!d.on && el) {
         el.remove();
       }
+    } else if (d.type === "zim:find") {
+      try {
+        window.find(String(d.q || ""), false, !!d.prev, true, false, false, false);
+      } catch (e) {}
     }
   });
 
@@ -44,6 +48,7 @@
     else if ((ev.ctrlKey || ev.metaKey) && ev.key === "-") k = "zoomout";
     else if ((ev.ctrlKey || ev.metaKey) && ev.key === "0") k = "zoomreset";
     else if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") k = "search";
+    else if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "f") k = "find";
     if (k) {
       ev.preventDefault();
       post({ type: "zim:key", key: k });

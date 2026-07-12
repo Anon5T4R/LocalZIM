@@ -45,6 +45,7 @@ pub struct Header {
     #[allow(dead_code)]
     pub major: u16,
     pub minor: u16,
+    pub uuid: [u8; 16],
     pub entry_count: u32,
     pub cluster_count: u32,
     pub url_ptr_pos: u64,
@@ -116,6 +117,7 @@ impl ZimFile {
         let header = Header {
             major: u16le(&hb, 4),
             minor: u16le(&hb, 6),
+            uuid: hb[8..24].try_into().unwrap(),
             entry_count: u32le(&hb, 24),
             cluster_count: u32le(&hb, 28),
             url_ptr_pos: u64le(&hb, 32),
@@ -285,15 +287,14 @@ impl ZimFile {
 
     // ---------- clusters e blobs ----------
 
-    fn cluster(&self, idx: u32) -> io::Result<Arc<ClusterData>> {
+    /// Identificador estável do arquivo (UUID do header em hex).
+    pub fn uuid_hex(&self) -> String {
+        self.header.uuid.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    fn cluster_range(&self, idx: u32) -> io::Result<(u64, u64)> {
         if idx >= self.header.cluster_count {
             return Err(bad("cluster fora do arquivo"));
-        }
-        {
-            let cache = self.cluster_cache.lock().unwrap();
-            if let Some(c) = cache.1.get(&idx) {
-                return Ok(c.clone());
-            }
         }
         let start = u64le(
             &self.read_at(self.header.cluster_ptr_pos + 8 * idx as u64, 8)?,
@@ -311,6 +312,17 @@ impl ZimFile {
         if end <= start {
             return Err(bad("cluster vazio ou corrompido"));
         }
+        Ok((start, end))
+    }
+
+    fn cluster(&self, idx: u32) -> io::Result<Arc<ClusterData>> {
+        {
+            let cache = self.cluster_cache.lock().unwrap();
+            if let Some(c) = cache.1.get(&idx) {
+                return Ok(c.clone());
+            }
+        }
+        let (start, end) = self.cluster_range(idx)?;
         let raw = self.read_at(start, (end - start) as usize)?;
         let comp = raw[0] & 0x0f;
         let extended = raw[0] & 0x10 != 0;
@@ -348,6 +360,38 @@ impl ZimFile {
     }
 
     pub fn blob(&self, cluster: u32, blob: u32) -> io::Result<Vec<u8>> {
+        // Cluster sem compressão: lê só a fatia do blob direto do arquivo,
+        // sem carregar o cluster inteiro (importante para vídeos grandes).
+        let (start, end) = self.cluster_range(cluster)?;
+        let head = self.read_at(start, 1)?[0];
+        if head & 0x0f <= 1 {
+            let extended = head & 0x10 != 0;
+            let osz: u64 = if extended { 8 } else { 4 };
+            let base = start + 1;
+            let read_off = |i: u64| -> io::Result<u64> {
+                let o = base + i * osz;
+                if o + osz > end {
+                    return Err(bad("offset de blob fora do cluster"));
+                }
+                Ok(if extended {
+                    u64le(&self.read_at(o, 8)?, 0)
+                } else {
+                    u32le(&self.read_at(o, 4)?, 0) as u64
+                })
+            };
+            let first = read_off(0)?;
+            let count = (first / osz).saturating_sub(1);
+            if blob as u64 >= count {
+                return Err(bad("blob fora do cluster"));
+            }
+            let a = read_off(blob as u64)?;
+            let b = read_off(blob as u64 + 1)?;
+            if b < a || base + b > end {
+                return Err(bad("blob corrompido"));
+            }
+            return self.read_at(base + a, (b - a) as usize);
+        }
+
         let c = self.cluster(cluster)?;
         let osz = if c.extended { 8usize } else { 4 };
         let get = |i: usize| -> io::Result<u64> {

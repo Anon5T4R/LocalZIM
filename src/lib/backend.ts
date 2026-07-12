@@ -21,9 +21,37 @@ export interface Suggestion {
   path: string;
 }
 
+export interface FtStatus {
+  state: "none" | "building" | "ready" | "error";
+  progress: number;
+  docs: number | null;
+}
+
+export interface FtHit {
+  title: string;
+  path: string;
+  /** HTML escapado pelo backend, com os termos da busca em <b>. */
+  snippet: string;
+  score: number;
+}
+
+export interface FtEvent {
+  id: string;
+  state: FtStatus["state"];
+  progress: number;
+  docs?: number;
+  error?: string;
+}
+
 export const openZim = (path: string) => invoke<ZimInfo>("open_zim", { path });
 export const closeZim = (id: string) => invoke<void>("close_zim", { id });
 export const zimSuggest = (id: string, query: string, limit = 12) =>
   invoke<Suggestion[]>("zim_suggest", { id, query, limit });
 export const zimRandom = (id: string) => invoke<string | null>("zim_random", { id });
 export const startupFile = () => invoke<string | null>("startup_file");
+
+export const fulltextStatus = (id: string) => invoke<FtStatus>("fulltext_status", { id });
+export const fulltextBuild = (id: string) => invoke<void>("fulltext_build", { id });
+export const fulltextCancel = (id: string) => invoke<void>("fulltext_cancel", { id });
+export const fulltextSearch = (id: string, query: string, limit = 30) =>
+  invoke<FtHit[]>("fulltext_search", { id, query, limit });

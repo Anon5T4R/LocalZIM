@@ -23,7 +23,15 @@ Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust). Licença MIT
 - **Biblioteca** com recentes persistidos (nome, descrição, idioma, tamanho, ícone do arquivo).
 - **Leitor** com voltar/avançar, página principal, **artigo aleatório**, **busca por título** com
   sugestões (prefixo + variantes de capitalização, usa o índice `X/listing/titleOrdered/v1`
-  quando existe), zoom por livro e **modo escuro** aplicado também dentro do artigo.
+  quando existe), zoom por livro, **localizar na página (Ctrl+F)** e **modo escuro** aplicado
+  também dentro do artigo.
+- **Busca no texto completo** (`src-tauri/src/search.rs`): o índice Xapian embutido nos ZIM
+  exige C++ e não é lido; em vez disso o LocalZIM constrói o próprio índice **tantivy** — uma
+  única vez, em segundo plano, com progresso e cancelamento — guardado na pasta de dados do
+  app (chaveado pelo UUID do arquivo). BM25 com boost de título, busca insensível a acentos
+  ("sao paulo" acha "São Paulo") e trechos com os termos destacados.
+- **Requisições Range** no protocolo (`206 Partial Content`) — vídeo e áudio com seek; clusters
+  sem compressão são lidos por fatia (vídeo grande não carrega o cluster inteiro na RAM).
 - Links externos abrem no navegador do sistema; associação de arquivo `.zim`; instância única
   (clique duplo num `.zim` reaproveita a janela aberta).
 
@@ -43,6 +51,7 @@ Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust). Licença MIT
 |---|---|
 | `Alt+←` / `Alt+→` | Voltar / avançar |
 | `Ctrl+K` | Focar a busca |
+| `Ctrl+F` | Localizar na página |
 | `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | Zoom (aumenta / diminui / 100%) |
 
 Funcionam inclusive com o foco dentro do artigo (a ponte injetada encaminha pro app).
@@ -62,12 +71,10 @@ Padrão da suíte: bump de versão em `package.json` + `src-tauri/tauri.conf.jso
 `src-tauri/Cargo.toml`, tag `vX.Y.Z`, push — o GitHub Actions builda NSIS (Windows) e
 AppImage (Linux) e publica a release.
 
-## Limitações conhecidas (v0.1)
+## Limitações conhecidas
 
-- **Sem busca full-text**: o índice Xapian embutido nos ZIM não é lido; a busca é por
-  prefixo de título (como as sugestões do Kiwix).
-- Vídeos tocam, mas **sem seek** (o protocolo ainda não responde requisições Range).
-- Clusters sem compressão são lidos inteiros por requisição (arquivos com vídeos grandes
-  podem gastar memória; há cache LRU de 12 clusters).
+- A busca no texto completo exige **criar o índice local uma vez** (botão no painel de busca);
+  para um ZIM gigante isso demora e ocupa espaço em disco proporcional ao arquivo. O índice
+  Xapian que já vem dentro do ZIM não é aproveitado (só é legível via libzim/C++).
 - Voltar/avançar usa o histórico do webview; ao alternar entre vários livros abertos o
   histórico é compartilhado entre eles.
