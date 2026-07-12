@@ -1,10 +1,15 @@
 # LocalZIM
 
-Leitor de bibliotecas **ZIM** (o formato do Kiwix) **100% offline** — Wikipédia inteira,
-Wikcionário, Stack Overflow, Projeto Gutenberg e qualquer outro arquivo de
+Leitor de bibliotecas **ZIM** **100% offline** — Wikipédia inteira, Wikcionário,
+Stack Overflow, Projeto Gutenberg e qualquer outro arquivo de
 [library.kiwix.org](https://library.kiwix.org) no seu computador, sem internet.
 
-Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust).
+> **Inspirado no [Kiwix](https://kiwix.org)** — o projeto que criou o formato ZIM e leva
+> conteúdo offline para o mundo inteiro. O LocalZIM é uma reimplementação independente do
+> leitor (Rust puro + Tauri); todo o crédito do formato e do ecossistema de conteúdo é do
+> time do [openZIM/Kiwix](https://github.com/openzim).
+
+Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust). Licença MIT.
 
 ## Funcionalidades
 
@@ -21,6 +26,26 @@ Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust).
   quando existe), zoom por livro e **modo escuro** aplicado também dentro do artigo.
 - Links externos abrem no navegador do sistema; associação de arquivo `.zim`; instância única
   (clique duplo num `.zim` reaproveita a janela aberta).
+
+## Onde conseguir (e como criar) arquivos .zim
+
+- **Baixar prontos:** [library.kiwix.org](https://library.kiwix.org) — Wikipédia (todas as
+  línguas e recortes), Wikcionário, Wikivoyage, Stack Overflow, Gutenberg, TED, DevDocs…
+- **Criar os seus:** [zimit](https://github.com/openzim/zimit) transforma qualquer site em um
+  `.zim` (crawler + empacotador). Tem versão hospedada em
+  [zimit.kiwix.org](https://zimit.kiwix.org) — cola a URL e recebe o arquivo pronto — e a
+  ferramenta em Docker para rodar local. Para converter outros conteúdos, veja as demais
+  ferramentas do [openZIM](https://github.com/openzim).
+
+## Atalhos
+
+| Atalho | Ação |
+|---|---|
+| `Alt+←` / `Alt+→` | Voltar / avançar |
+| `Ctrl+K` | Focar a busca |
+| `Ctrl+=` / `Ctrl+-` / `Ctrl+0` | Zoom (aumenta / diminui / 100%) |
+
+Funcionam inclusive com o foco dentro do artigo (a ponte injetada encaminha pro app).
 
 ## Desenvolvimento
 

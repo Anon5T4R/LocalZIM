@@ -4,6 +4,8 @@ version = "0.1.0"
 description = "LocalZIM — leitor de bibliotecas ZIM (Kiwix) 100% offline"
 authors = ["Taylor"]
 edition = "2021"
+license = "MIT"
+repository = "https://github.com/Anon5T4R/LocalZIM"
 
 [lib]
 # O sufixo `_lib` evita conflito entre o nome da lib e o do binário no Windows

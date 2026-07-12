@@ -179,7 +179,7 @@ fn encode_entry_path(p: &str) -> String {
 
 fn http_error(status: u16, msg: &str) -> tauri::http::Response<Vec<u8>> {
     let body = format!(
-        "<!doctype html><html lang=\"pt-BR\"><meta charset=\"utf-8\"><body style=\"font-family:sans-serif;color:#555;text-align:center;padding-top:15vh\"><h2>{status}</h2><p>{msg}</p></body></html>"
+        "<!doctype html><html lang=\"pt-BR\"><meta charset=\"utf-8\"><body style=\"font-family:sans-serif;color:#555;text-align:center;padding-top:15vh\"><h2>{status}</h2><p>{msg}</p><p><a href=\"javascript:history.back()\" style=\"color:#7c3aed\">&larr; Voltar</a></p></body></html>"
     );
     tauri::http::Response::builder()
         .status(status)

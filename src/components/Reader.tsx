@@ -37,10 +37,27 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
   const [sugs, setSugs] = useState<Suggestion[]>([]);
   const [showSugs, setShowSugs] = useState(false);
   const [sel, setSel] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const postToFrame = (msg: unknown) => {
     iframeRef.current?.contentWindow?.postMessage(msg, "*");
   };
+
+  // Ações dos atalhos (Alt+←/→, Ctrl+=/−/0, Ctrl+K) — vindas da ponte no
+  // artigo ou do teclado com foco no app. Ref para o handler montado uma vez.
+  const keyAction = (k: string) => {
+    if (k === "back") history.back();
+    else if (k === "forward") history.forward();
+    else if (k === "zoomin") applyZoom(zoomRef.current + 10);
+    else if (k === "zoomout") applyZoom(zoomRef.current - 10);
+    else if (k === "zoomreset") applyZoom(100);
+    else if (k === "search") {
+      searchRef.current?.focus();
+      searchRef.current?.select();
+    }
+  };
+  const keyActionRef = useRef(keyAction);
+  keyActionRef.current = keyAction;
 
   // navegação imperativa vinda do App (abrir livro, trocar de livro)
   useEffect(() => {
@@ -81,10 +98,31 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
           .catch(() => {});
       } else if (d.type === "zim:external" && d.url) {
         openUrl(String(d.url)).catch(() => {});
+      } else if (d.type === "zim:key" && (d as { key?: string }).key) {
+        keyActionRef.current(String((d as { key?: string }).key));
       }
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
+  }, []);
+
+  // mesmos atalhos com o foco no próprio app
+  useEffect(() => {
+    const onKey = (ev: KeyboardEvent) => {
+      let k: string | null = null;
+      if (ev.altKey && ev.key === "ArrowLeft") k = "back";
+      else if (ev.altKey && ev.key === "ArrowRight") k = "forward";
+      else if ((ev.ctrlKey || ev.metaKey) && (ev.key === "=" || ev.key === "+")) k = "zoomin";
+      else if ((ev.ctrlKey || ev.metaKey) && ev.key === "-") k = "zoomout";
+      else if ((ev.ctrlKey || ev.metaKey) && ev.key === "0") k = "zoomreset";
+      else if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") k = "search";
+      if (k) {
+        ev.preventDefault();
+        keyActionRef.current(k);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   // sugestões com debounce

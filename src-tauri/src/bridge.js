@@ -34,6 +34,22 @@
     }
   });
 
+  // Atalhos de teclado funcionam mesmo com o foco dentro do artigo:
+  // a ponte encaminha o comando pro app decidir.
+  document.addEventListener("keydown", function (ev) {
+    var k = null;
+    if (ev.altKey && ev.key === "ArrowLeft") k = "back";
+    else if (ev.altKey && ev.key === "ArrowRight") k = "forward";
+    else if ((ev.ctrlKey || ev.metaKey) && (ev.key === "=" || ev.key === "+")) k = "zoomin";
+    else if ((ev.ctrlKey || ev.metaKey) && ev.key === "-") k = "zoomout";
+    else if ((ev.ctrlKey || ev.metaKey) && ev.key === "0") k = "zoomreset";
+    else if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === "k") k = "search";
+    if (k) {
+      ev.preventDefault();
+      post({ type: "zim:key", key: k });
+    }
+  });
+
   // Links externos abrem no navegador do sistema, nunca dentro do leitor.
   document.addEventListener(
     "click",
