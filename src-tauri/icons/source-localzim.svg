@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5b21b6"/>
+      <stop offset="1" stop-color="#8b5cf6"/>
+    </linearGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="200" fill="url(#bg)"/>
+  <!-- livro aberto -->
+  <g fill="none" stroke="#ffffff" stroke-width="52" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M 512 312 C 436 258 336 250 248 282 V 712 C 336 680 436 688 512 742"/>
+    <path d="M 512 312 C 588 258 688 250 776 282 V 712 C 688 680 588 688 512 742"/>
+    <line x1="512" y1="312" x2="512" y2="742"/>
+  </g>
+  <!-- linhas de texto nas páginas -->
+  <g stroke="#ffffff" stroke-width="30" stroke-linecap="round" opacity="0.9">
+    <line x1="322" y1="408" x2="448" y2="390"/>
+    <line x1="322" y1="496" x2="448" y2="478"/>
+    <line x1="322" y1="584" x2="448" y2="566"/>
+    <line x1="576" y1="390" x2="702" y2="408"/>
+    <line x1="576" y1="478" x2="702" y2="496"/>
+    <line x1="576" y1="566" x2="702" y2="584"/>
+  </g>
+  <!-- easter egg da marca -->
+  <text x="512" y="905" text-anchor="middle" font-family="Segoe Script, Brush Script MT, cursive" font-size="96" fill="#ffffff" opacity="0.92">Taylor</text>
+</svg>
