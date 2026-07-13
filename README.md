@@ -34,8 +34,9 @@ Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust). Licença MIT
   baixados uma vez por direção — detalhes na seção abaixo.
 - **Requisições Range** no protocolo (`206 Partial Content`) — vídeo e áudio com seek; clusters
   sem compressão são lidos por fatia (vídeo grande não carrega o cluster inteiro na RAM).
-- Links externos abrem no navegador do sistema; associação de arquivo `.zim`; instância única
-  (clique duplo num `.zim` reaproveita a janela aberta).
+- Links externos (fora do arquivo) mostram um **aviso de "sair do arquivo"** com o destino antes
+  de abrir no navegador do sistema — com opção de não avisar de novo na sessão. Associação de
+  arquivo `.zim`; instância única (clique duplo num `.zim` reaproveita a janela aberta).
 - **Criar .zim de uma pasta** (`src-tauri/src/zimwriter.rs`): empacota uma pasta com HTML
   (site salvo com `wget --mirror`, documentação, notas exportadas) num `.zim` válido — título
   extraído de cada página, metadados, favicon, clusters zstd pra texto e crus pra mídia

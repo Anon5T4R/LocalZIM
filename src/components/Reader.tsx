@@ -50,6 +50,15 @@ const TR_BATCH = 8;
 
 const fmtMB = (bytes: number) => `${Math.max(1, Math.round(bytes / 1e6))} MB`;
 
+/** Host de uma URL pra exibir em destaque no aviso (ex.: doc.rust-lang.org). */
+function urlHost(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
 export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onLoaded }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [title, setTitle] = useState("");
@@ -62,6 +71,10 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
   onLoadedRef.current = onLoaded;
   const activeIdRef = useRef(active.id);
   activeIdRef.current = active.id;
+
+  // link pra fora do arquivo: confirma antes de mandar pro navegador
+  const [extUrl, setExtUrl] = useState<string | null>(null);
+  const skipExtWarn = useRef(false);
 
   const [query, setQuery] = useState("");
   const [sugs, setSugs] = useState<Suggestion[]>([]);
@@ -328,6 +341,19 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
     postToFrame({ type: "zim:dark", on: dark });
   }, [dark]);
 
+  // Esc fecha o aviso de link externo
+  useEffect(() => {
+    if (!extUrl) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setExtUrl(null);
+      }
+    };
+    window.addEventListener("keydown", onKey, true);
+    return () => window.removeEventListener("keydown", onKey, true);
+  }, [extUrl]);
+
   // mensagens da ponte injetada nas páginas
   useEffect(() => {
     const onMsg = (ev: MessageEvent) => {
@@ -373,7 +399,9 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
         trBlocksResolve.current?.(Array.isArray(d.texts) ? d.texts.map(String) : []);
         trBlocksResolve.current = null;
       } else if (d.type === "zim:external" && d.url) {
-        openUrl(String(d.url)).catch(() => {});
+        const url = String(d.url);
+        if (skipExtWarn.current) openUrl(url).catch(() => {});
+        else setExtUrl(url);
       } else if (d.type === "zim:key" && d.key) {
         keyActionRef.current(String(d.key));
       }
@@ -588,6 +616,44 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
             <button className="tb" onClick={() => setFindOpen(false)} title="Fechar (Esc)">
               ✕
             </button>
+          </div>
+        )}
+
+        {extUrl && (
+          <div className="modal-overlay" onClick={() => setExtUrl(null)}>
+            <div className="modal ext-modal" onClick={(e) => e.stopPropagation()}>
+              <h3>Sair do arquivo</h3>
+              <p className="modal-hint">
+                Este link não faz parte do arquivo <strong>{active.name}</strong> — ele aponta
+                para <strong>{urlHost(extUrl)}</strong>, na internet. Quer abrir no seu navegador?
+              </p>
+              <div className="ext-url" title={extUrl}>
+                {extUrl}
+              </div>
+              <label className="form-check">
+                <input
+                  type="checkbox"
+                  onChange={(e) => {
+                    skipExtWarn.current = e.target.checked;
+                  }}
+                />
+                Não avisar de novo enquanto o LocalZIM estiver aberto
+              </label>
+              <div className="modal-actions">
+                <button
+                  className="primary"
+                  onClick={() => {
+                    openUrl(extUrl).catch(() => {});
+                    setExtUrl(null);
+                  }}
+                >
+                  Abrir no navegador
+                </button>
+                <button className="ghost" onClick={() => setExtUrl(null)}>
+                  Cancelar
+                </button>
+              </div>
+            </div>
           </div>
         )}
 

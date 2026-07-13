@@ -1,6 +1,6 @@
 [package]
 name = "localzim"
-version = "0.5.2"
+version = "0.5.3"
 description = "LocalZIM — leitor de bibliotecas ZIM (Kiwix) 100% offline"
 authors = ["Taylor"]
 edition = "2021"
