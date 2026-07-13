@@ -63,11 +63,30 @@ export interface CreateZimSpec {
 export interface ZimCreateEvent {
   state: "building" | "done" | "error";
   progress: number;
+  /** Presente na criação a partir de site: "crawl" (baixando) ou "pack". */
+  phase?: "crawl" | "pack";
+  pages?: number;
+  files?: number;
+  queued?: number;
   result?: { entries: number; articles: number; size: number; output: string };
   error?: string;
 }
 
+export interface CrawlZimSpec {
+  url: string;
+  output: string;
+  title: string;
+  description?: string;
+  language?: string;
+  creator?: string;
+  maxDepth?: number;
+  maxPages?: number;
+  delayMs?: number;
+}
+
 export const createZim = (spec: CreateZimSpec) => invoke<void>("create_zim", { spec });
+export const createZimFromSite = (spec: CrawlZimSpec) =>
+  invoke<void>("create_zim_from_site", { spec });
 export const cancelCreateZim = () => invoke<void>("cancel_create_zim");
 
 export const fulltextStatus = (id: string) => invoke<FtStatus>("fulltext_status", { id });

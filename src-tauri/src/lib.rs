@@ -4,6 +4,7 @@
 //! `zim://` (no Windows vira `http://zim.localhost/`): `/<id>/<N>/<url>`, onde
 //! `id` identifica o arquivo aberto e `N/url` é o caminho da entrada no ZIM.
 
+mod crawler;
 mod search;
 mod zim;
 mod zimwriter;
@@ -381,6 +382,134 @@ fn cancel_create_zim(state: State<'_, AppState>) {
     }
 }
 
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CrawlZimSpec {
+    url: String,
+    output: String,
+    title: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    language: String,
+    #[serde(default)]
+    creator: String,
+    #[serde(default)]
+    max_depth: Option<u32>,
+    #[serde(default)]
+    max_pages: Option<u32>,
+    #[serde(default)]
+    delay_ms: Option<u64>,
+}
+
+/// Baixa um site (crawler estático, mesmo host, robots.txt respeitado) e
+/// empacota num .zim. Mesmo canal de eventos "zim-create", com `phase`:
+/// "crawl" (contagem de páginas) e "pack" (progresso do empacotamento).
+#[tauri::command]
+async fn create_zim_from_site(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    spec: CrawlZimSpec,
+) -> Result<(), String> {
+    let cancel = {
+        let mut slot = state.zim_create.lock().unwrap();
+        if slot.is_some() {
+            return Err("Já existe uma criação de ZIM em andamento".into());
+        }
+        let c = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        *slot = Some(c.clone());
+        c
+    };
+    std::thread::spawn(move || {
+        let done = |app: &tauri::AppHandle| {
+            *app.state::<AppState>().zim_create.lock().unwrap() = None;
+        };
+        let staging = std::env::temp_dir().join(format!(
+            "localzim-crawl-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.subsec_nanos())
+                .unwrap_or(0)
+        ));
+
+        let cspec = crawler::CrawlSpec {
+            start_url: spec.url.clone(),
+            max_depth: spec.max_depth.unwrap_or(3),
+            max_pages: spec.max_pages.unwrap_or(200),
+            delay_ms: spec.delay_ms.unwrap_or(200),
+        };
+        let max_pages = cspec.max_pages.max(1);
+        let _ = app.emit(
+            "zim-create",
+            json!({ "state": "building", "phase": "crawl", "progress": 0.0, "pages": 0 }),
+        );
+        let outcome = crawler::crawl(&cspec, &staging, &cancel, |p| {
+            let _ = app.emit(
+                "zim-create",
+                json!({
+                    "state": "building",
+                    "phase": "crawl",
+                    "progress": (p.pages as f32 / max_pages as f32).min(1.0),
+                    "pages": p.pages,
+                    "files": p.files,
+                    "queued": p.queued,
+                }),
+            );
+        });
+        let outcome = match outcome {
+            Ok(o) => o,
+            Err(e) => {
+                let _ = fs_remove_dir(&staging);
+                done(&app);
+                let _ = app.emit("zim-create", json!({ "state": "error", "progress": 0.0, "error": e }));
+                return;
+            }
+        };
+
+        let ws = zimwriter::CreateSpec {
+            source: staging.clone(),
+            output: PathBuf::from(&spec.output),
+            title: spec.title.clone(),
+            description: spec.description.clone(),
+            language: if spec.language.trim().is_empty() {
+                "por".into()
+            } else {
+                spec.language.clone()
+            },
+            creator: spec.creator.clone(),
+            main_page: Some(outcome.main_local.clone()),
+        };
+        let res = zimwriter::create(&ws, &cancel, |p| {
+            let _ = app.emit(
+                "zim-create",
+                json!({ "state": "building", "phase": "pack", "progress": p }),
+            );
+        });
+        let _ = fs_remove_dir(&staging);
+        done(&app);
+        let payload = match res {
+            Ok(r) => json!({
+                "state": "done",
+                "progress": 1.0,
+                "result": CreateZimResult {
+                    entries: r.entries,
+                    articles: r.articles,
+                    size: r.size,
+                    output: spec.output,
+                },
+            }),
+            Err(e) => json!({ "state": "error", "progress": 0.0, "error": e }),
+        };
+        let _ = app.emit("zim-create", payload);
+    });
+    Ok(())
+}
+
+fn fs_remove_dir(p: &std::path::Path) -> std::io::Result<()> {
+    std::fs::remove_dir_all(p)
+}
+
 // ---------- protocolo zim:// ----------
 
 fn encode_entry_path(p: &str) -> String {
@@ -599,6 +728,7 @@ pub fn run() {
             fulltext_cancel,
             fulltext_search,
             create_zim,
+            create_zim_from_site,
             cancel_create_zim
         ])
         .run(tauri::generate_context!())

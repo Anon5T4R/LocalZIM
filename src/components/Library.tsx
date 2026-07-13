@@ -2,7 +2,13 @@ import { useEffect, useState } from "react";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { listen } from "@tauri-apps/api/event";
-import { cancelCreateZim, createZim, ZimCreateEvent, ZimInfo } from "../lib/backend";
+import {
+  cancelCreateZim,
+  createZim,
+  createZimFromSite,
+  ZimCreateEvent,
+  ZimInfo,
+} from "../lib/backend";
 import { formatBytes } from "../lib/paths";
 import { loadRecents, removeRecent, RecentBook } from "../lib/recents";
 
@@ -12,6 +18,14 @@ interface Props {
   onOpenPath: (path: string) => void;
   onActivate: (id: string) => void;
   onCloseBook: (id: string) => void;
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return "";
+  }
 }
 
 function metaLine(language: string, size: number, articles: number | null): string {
@@ -94,6 +108,42 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
     }
   };
 
+  // criador a partir de um site (crawler local)
+  const [siteOpen, setSiteOpen] = useState(false);
+  const [sUrl, setSUrl] = useState("");
+  const [sOutput, setSOutput] = useState("");
+  const [sTitle, setSTitle] = useState("");
+  const [sDesc, setSDesc] = useState("");
+  const [sLang, setSLang] = useState("por");
+  const [sDepth, setSDepth] = useState("3");
+  const [sMaxPages, setSMaxPages] = useState("200");
+
+  const pickSiteOutput = async () => {
+    const sel = await saveDialog({
+      title: "Salvar arquivo ZIM",
+      defaultPath: `${(sTitle || "site").replace(/[\\/:*?"<>|]/g, "-")}.zim`,
+      filters: [{ name: "Arquivo ZIM", extensions: ["zim"] }],
+    });
+    if (typeof sel === "string") setSOutput(sel);
+  };
+
+  const startSite = async () => {
+    setCState({ state: "building", progress: 0, phase: "crawl", pages: 0 });
+    try {
+      await createZimFromSite({
+        url: sUrl.trim(),
+        output: sOutput,
+        title: sTitle.trim() || hostOf(sUrl) || "Site",
+        description: sDesc,
+        language: sLang,
+        maxDepth: Math.max(0, parseInt(sDepth, 10) || 3),
+        maxPages: Math.max(1, parseInt(sMaxPages, 10) || 200),
+      });
+    } catch (e) {
+      setCState({ state: "error", progress: 0, error: String(e) });
+    }
+  };
+
   const building = cState?.state === "building";
 
   const openPaths = new Set(books.map((b) => b.path));
@@ -121,6 +171,16 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
             title="Empacota uma pasta com HTML num arquivo .zim"
           >
             Criar .zim de uma pasta…
+          </button>
+          <button
+            className="secondary"
+            onClick={() => {
+              setCState(null);
+              setSiteOpen(true);
+            }}
+            title="Baixa um site (crawler local) e empacota num .zim"
+          >
+            Criar .zim de um site…
           </button>
         </div>
       </header>
@@ -216,6 +276,117 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
           <button className="primary" onClick={pickFile}>
             Abrir arquivo .zim…
           </button>
+        </div>
+      )}
+
+      {siteOpen && (
+        <div className="modal-overlay" onClick={() => !building && setSiteOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Criar .zim de um site</h3>
+            <p className="modal-hint">
+              Crawler local: baixa as páginas do <strong>mesmo domínio</strong> (respeitando o
+              robots.txt) com imagens, CSS e scripts, reescreve os links e empacota. Funciona bem
+              pra documentação, blogs e wikis; sites montados por JavaScript (SPA) podem sair
+              incompletos — pra esses, use o{" "}
+              <a
+                href="https://github.com/openzim/zimit"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openUrl("https://github.com/openzim/zimit").catch(() => {});
+                }}
+              >
+                zimit
+              </a>
+              .
+            </p>
+
+            <div className="form-row">
+              <label>Endereço do site</label>
+              <input
+                value={sUrl}
+                onChange={(e) => {
+                  setSUrl(e.target.value);
+                  if (!sTitle) setSTitle(hostOf(e.target.value));
+                }}
+                disabled={building}
+                placeholder="https://docs.exemplo.com"
+                spellCheck={false}
+              />
+            </div>
+            <div className="form-row">
+              <label>Salvar como</label>
+              <div className="form-pick">
+                <input value={sOutput} readOnly placeholder="destino do arquivo .zim" />
+                <button onClick={pickSiteOutput} disabled={building}>
+                  Escolher…
+                </button>
+              </div>
+            </div>
+            <div className="form-grid">
+              <div className="form-row">
+                <label>Título</label>
+                <input value={sTitle} onChange={(e) => setSTitle(e.target.value)} disabled={building} />
+              </div>
+              <div className="form-row">
+                <label>Idioma</label>
+                <input value={sLang} onChange={(e) => setSLang(e.target.value)} disabled={building} />
+              </div>
+            </div>
+            <div className="form-row">
+              <label>Descrição</label>
+              <input value={sDesc} onChange={(e) => setSDesc(e.target.value)} disabled={building} />
+            </div>
+            <div className="form-grid">
+              <div className="form-row">
+                <label>Profundidade de links</label>
+                <input value={sDepth} onChange={(e) => setSDepth(e.target.value)} disabled={building} />
+              </div>
+              <div className="form-row">
+                <label>Máximo de páginas</label>
+                <input
+                  value={sMaxPages}
+                  onChange={(e) => setSMaxPages(e.target.value)}
+                  disabled={building}
+                />
+              </div>
+            </div>
+
+            {building && (
+              <div className="ft-block" style={{ padding: "10px 0 0" }}>
+                <p style={{ margin: "0 0 6px" }}>
+                  {cState?.phase === "crawl"
+                    ? `Baixando páginas… ${cState?.pages ?? 0} (fila: ${cState?.queued ?? 0})`
+                    : `Empacotando… ${Math.round((cState?.progress ?? 0) * 100)}%`}
+                </p>
+                <div className="ft-progress">
+                  <div style={{ width: `${(cState?.progress ?? 0) * 100}%` }} />
+                </div>
+              </div>
+            )}
+            {cState?.state === "error" && <div className="error-banner">{cState.error}</div>}
+            {cState?.state === "done" && cState.result && (
+              <div className="ok-banner">
+                Pronto: {cState.result.articles} páginas, {formatBytes(cState.result.size)} — o
+                arquivo já foi aberto na biblioteca.
+              </div>
+            )}
+
+            <div className="modal-actions">
+              {!building && (
+                <button className="primary" disabled={!sUrl.trim() || !sOutput} onClick={startSite}>
+                  Baixar e criar
+                </button>
+              )}
+              {building && (
+                <button className="ghost" onClick={() => cancelCreateZim()}>
+                  Cancelar
+                </button>
+              )}
+              <button disabled={building} onClick={() => setSiteOpen(false)}>
+                Fechar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
