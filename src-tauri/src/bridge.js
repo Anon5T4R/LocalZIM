@@ -12,7 +12,71 @@
   }
 
   function announce() {
-    post({ type: "zim:loaded", title: document.title, href: location.href });
+    post({
+      type: "zim:loaded",
+      title: document.title,
+      href: location.href,
+      lang: document.documentElement.lang || "",
+    });
+  }
+
+  // ---- tradução: coleta de blocos de texto e aplicação progressiva ----
+  // Blocos "folha" (sem outro bloco dentro): a tradução troca o textContent
+  // (marcação inline se perde no bloco traduzido; o original fica guardado
+  // pra restaurar na hora com "ver original").
+  var trNodes = [];
+  var trOrig = [];
+  var trDone = [];
+  var trShowing = false;
+
+  var BLOCKS =
+    "p,li,h1,h2,h3,h4,h5,h6,blockquote,figcaption,caption,th,td,dt,dd,summary";
+
+  function collectBlocks() {
+    trNodes = [];
+    trOrig = [];
+    trDone = [];
+    trShowing = false;
+    var all = document.querySelectorAll(BLOCKS);
+    var texts = [];
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i];
+      if (el.querySelector(BLOCKS)) continue; // só folhas
+      if (el.closest("pre,code,script,style,noscript,textarea")) continue;
+      var t = (el.textContent || "").replace(/\s+/g, " ").trim();
+      // exige pelo menos uma letra (latina/grega/cirílica/CJK/hangul)
+      if (t.length < 2) continue;
+      if (!/[a-zA-ZÀ-ɏͰ-ӿ぀-鿿가-힯]/.test(t)) continue;
+      trNodes.push(el);
+      trOrig.push(el.innerHTML);
+      trDone.push(null);
+      texts.push(t);
+    }
+    post({ type: "zim:blocks", texts: texts });
+  }
+
+  function applyBlocks(from, texts) {
+    for (var i = 0; i < texts.length; i++) {
+      var idx = from + i;
+      if (!trNodes[idx] || !texts[i]) continue;
+      trDone[idx] = texts[i];
+      if (!trShowing && trNodes[idx].isConnected) {
+        trNodes[idx].textContent = texts[i];
+      }
+    }
+  }
+
+  // true = original, false = tradução
+  function showOriginal(on) {
+    trShowing = !!on;
+    for (var i = 0; i < trNodes.length; i++) {
+      if (!trNodes[i].isConnected) continue;
+      if (on) {
+        if (trDone[i] !== null) trNodes[i].innerHTML = trOrig[i];
+      } else if (trDone[i] !== null) {
+        trNodes[i].textContent = trDone[i];
+      }
+    }
   }
 
   window.addEventListener("message", function (ev) {
@@ -35,6 +99,12 @@
       try {
         window.find(String(d.q || ""), false, !!d.prev, true, false, false, false);
       } catch (e) {}
+    } else if (d.type === "zim:collect") {
+      collectBlocks();
+    } else if (d.type === "zim:apply") {
+      applyBlocks(d.from | 0, d.texts || []);
+    } else if (d.type === "zim:original") {
+      showOriginal(!!d.on);
     }
   });
 

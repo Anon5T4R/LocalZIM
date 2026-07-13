@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "directions": {
+    "en-pt": {
+      "repo": "Helsinki-NLP/opus-mt-tc-big-en-pt",
+      "prefix": ">>pob<<",
+      "files": {
+        "model.safetensors": {
+          "sha256": "b052a5b480b608dcfaf099994ae01360ba35610aead67dc418c145f76c89ef5f",
+          "bytes": 465035048
+        },
+        "config.json": {
+          "sha256": "ca76b1818f066007e94fb2519c0752320cee36a5d4947bf7ef4477c845feacc5",
+          "bytes": 1076
+        },
+        "tokenizer-src.json": {
+          "sha256": "2e7375013d355ec367bba61d075f8d773d45f0e1d49bb14858f8c7768c097761",
+          "bytes": 3525744
+        },
+        "tokenizer-tgt.json": {
+          "sha256": "37416ed2b801bb1865e256b4329ece5fbc40ddeb76ce2da729889d38f6e16db6",
+          "bytes": 3548026
+        }
+      }
+    },
+    "pt-en": {
+      "repo": "Helsinki-NLP/opus-mt-ROMANCE-en",
+      "prefix": "",
+      "files": {
+        "model.safetensors": {
+          "sha256": "2847651bb7491b254ab52fbb5b7309c50c42eff8f4b6252b5605781722edf067",
+          "bytes": 289168234
+        },
+        "config.json": {
+          "sha256": "b11b54220c28a64966b51864dd4bf9688a935c3b6a18bbab73810d391d6ac39f",
+          "bytes": 1366
+        },
+        "tokenizer-src.json": {
+          "sha256": "c59dcfd65b3b9866490dae80d94cc58d3dd0743f4c86cf67593d368d98a5e9a1",
+          "bytes": 4023477
+        },
+        "tokenizer-tgt.json": {
+          "sha256": "d9a9b01bbf4586f1fe0b6b5677664626edeb937bb352181513794263c03652ff",
+          "bytes": 4002561
+        }
+      }
+    },
+    "en-es": {
+      "repo": "Helsinki-NLP/opus-mt-en-es",
+      "prefix": "",
+      "files": {
+        "model.safetensors": {
+          "sha256": "fea41c33b2e3737905a754a3f69f1f1f746027a58987ea4b70e72047b27f8523",
+          "bytes": 289168234
+        },
+        "config.json": {
+          "sha256": "666ad3c2943674b6a789e311d221e44ec23e27f1bd9727930754bf773ec8e464",
+          "bytes": 1473
+        },
+        "tokenizer-src.json": {
+          "sha256": "30a3a733116a1777e2b015faa41ec64543c4b0ba985a4819b38ddfe0b3c9a512",
+          "bytes": 4025946
+        },
+        "tokenizer-tgt.json": {
+          "sha256": "ffdedb11c4702eefd9fb3657c973ed87236a7d8668a10f7092690f594455f946",
+          "bytes": 4050147
+        }
+      }
+    },
+    "es-en": {
+      "repo": "Helsinki-NLP/opus-mt-es-en",
+      "prefix": "",
+      "files": {
+        "model.safetensors": {
+          "sha256": "542b089c37abed3d0c283decb90ecd1508d1d18f0713bc147e211e05c9b40457",
+          "bytes": 289168234
+        },
+        "config.json": {
+          "sha256": "374443eacf8986c21386503e2fcd52eae6952ac09c87fd36695f5c12259a4cd1",
+          "bytes": 1438
+        },
+        "tokenizer-src.json": {
+          "sha256": "ffdedb11c4702eefd9fb3657c973ed87236a7d8668a10f7092690f594455f946",
+          "bytes": 4050147
+        },
+        "tokenizer-tgt.json": {
+          "sha256": "30a3a733116a1777e2b015faa41ec64543c4b0ba985a4819b38ddfe0b3c9a512",
+          "bytes": 4025946
+        }
+      }
+    }
+  }
+}

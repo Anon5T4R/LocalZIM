@@ -30,6 +30,8 @@ Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust). Licença MIT
   única vez, em segundo plano, com progresso e cancelamento — guardado na pasta de dados do
   app (chaveado pelo UUID do arquivo). BM25 com boost de título, busca insensível a acentos
   ("sao paulo" acha "São Paulo") e trechos com os termos destacados.
+- **Tradução offline de artigos** (pt-BR · es · en): modelos Marian/OPUS-MT no candle, na CPU,
+  baixados uma vez por direção — detalhes na seção abaixo.
 - **Requisições Range** no protocolo (`206 Partial Content`) — vídeo e áudio com seek; clusters
   sem compressão são lidos por fatia (vídeo grande não carrega o cluster inteiro na RAM).
 - Links externos abrem no navegador do sistema; associação de arquivo `.zim`; instância única
@@ -46,6 +48,26 @@ Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust). Licença MIT
   `@import` dos CSS e reescreve todos os links pra caminhos relativos (externos ficam absolutos
   e abrem no navegador). Ótimo pra documentação, blogs e wikis; sites montados por JavaScript
   (SPA) podem sair incompletos — pra esses, zimit.
+
+## Tradução offline (pt-BR · es · en)
+
+O leitor traduz artigos inteiros **sem internet**, com modelos
+[Marian/OPUS-MT da Helsinki-NLP](https://huggingface.co/Helsinki-NLP) rodando no
+[candle](https://github.com/huggingface/candle) (CPU, dentro do próprio app — sem
+Python nem runtime externo):
+
+- Botão **🌐** na toolbar: escolha o idioma alvo (português · español · english); o idioma
+  do artigo é detectado pelo metadado do livro/página, com ajuste manual se precisar.
+- Cada direção baixa **um modelo uma única vez** (289–465 MB, hospedados nas releases do
+  [LocalZIM-models](https://github.com/Anon5T4R/LocalZIM-models), sha256 conferido).
+  pt ↔ es não tem modelo dedicado — o app **pivota pelo inglês** (dois modelos).
+- en → pt usa o `opus-mt-tc-big-en-pt` com alvo `>>pob<<` (**português brasileiro**).
+- A tradução troca os blocos de texto do artigo progressivamente, com barra de progresso;
+  **"ver original"** restaura na hora (a marcação inline do bloco traduzido vira texto
+  simples — links dentro de parágrafos traduzidos deixam de ser clicáveis).
+- Resultado fica em **cache por artigo/direção** (revisitar é instantâneo) e há opção de
+  traduzir as próximas páginas automaticamente. Modelos saem da RAM após ~5 min sem uso e
+  podem ser apagados do disco pelo próprio painel.
 
 ## Onde conseguir (e como criar) arquivos .zim
 

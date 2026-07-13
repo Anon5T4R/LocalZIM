@@ -6,6 +6,7 @@
 
 mod crawler;
 mod search;
+mod translate;
 mod zim;
 mod zimwriter;
 
@@ -52,6 +53,8 @@ struct AppState {
     ft_indexes: Mutex<HashMap<String, Arc<search::FtIndex>>>,
     /// Criação de ZIM em andamento (uma por vez); o flag cancela.
     zim_create: Mutex<Option<Arc<std::sync::atomic::AtomicBool>>>,
+    /// Modelos de tradução (downloads, engines carregadas na RAM).
+    translator: translate::Translator,
 }
 
 fn get_book(state: &AppState, id: &str) -> Result<Arc<ZimFile>, String> {
@@ -284,6 +287,118 @@ async fn fulltext_search(
         }
     };
     search::search(&ft, &file, &query, limit.unwrap_or(20))
+}
+
+// ---------- tradução offline ----------
+
+fn app_data(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    app.path().app_data_dir().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn translate_status(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    direction: String,
+) -> Result<translate::DirectionStatus, String> {
+    let dir = app_data(&app)?;
+    translate::direction_status(&dir, &state.translator, &direction)
+        .ok_or_else(|| format!("direção não suportada: {direction}"))
+}
+
+/// Baixa um modelo (uma "perna") em thread própria; progresso via evento
+/// "translate-model" ({leg, state: downloading|ready|error, received, total}).
+#[tauri::command]
+async fn translate_download(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    leg: String,
+) -> Result<(), String> {
+    let Some(cancel) = translate::start_download(&state.translator, &leg) else {
+        return Ok(()); // já está baixando
+    };
+    std::thread::spawn(move || {
+        let mut last = std::time::Instant::now() - std::time::Duration::from_secs(1);
+        let dir = match app_data(&app) {
+            Ok(d) => d,
+            Err(e) => {
+                translate::finish_download(&app.state::<AppState>().translator, &leg);
+                let _ = app.emit("translate-model", json!({ "leg": leg, "state": "error", "error": e }));
+                return;
+            }
+        };
+        let res = translate::download_leg(&dir, &leg, &cancel, |received, total| {
+            // sem spam de eventos: no máximo ~7 por segundo
+            if last.elapsed().as_millis() >= 150 || received == total {
+                last = std::time::Instant::now();
+                let _ = app.emit(
+                    "translate-model",
+                    json!({ "leg": leg, "state": "downloading", "received": received, "total": total }),
+                );
+            }
+        });
+        translate::finish_download(&app.state::<AppState>().translator, &leg);
+        let payload = match res {
+            Ok(()) => json!({ "leg": leg, "state": "ready" }),
+            Err(e) if e == "cancelado" => json!({ "leg": leg, "state": "cancelled" }),
+            Err(e) => json!({ "leg": leg, "state": "error", "error": e }),
+        };
+        let _ = app.emit("translate-model", payload);
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn translate_cancel_download(state: State<'_, AppState>, leg: String) {
+    translate::cancel_download(&state.translator, &leg);
+}
+
+#[tauri::command]
+async fn translate_remove(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    leg: String,
+) -> Result<(), String> {
+    let dir = app_data(&app)?;
+    translate::remove_leg(&dir, &state.translator, &leg)
+}
+
+/// Carrega o(s) modelo(s) da direção na RAM (a UI mostra "carregando modelo"
+/// enquanto isso, separado do progresso de tradução).
+#[tauri::command]
+async fn translate_prepare(app: tauri::AppHandle, direction: String) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = app_data(&app)?;
+        translate::prepare(&dir, &app.state::<AppState>().translator, &direction)
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Traduz um lote de blocos de texto de um artigo (com cache em disco).
+#[tauri::command]
+async fn translate_texts(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    article: String,
+    direction: String,
+    texts: Vec<String>,
+) -> Result<Vec<String>, String> {
+    let uuid = get_book(&state, &id)?.uuid_hex();
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = app_data(&app)?;
+        translate::translate_texts(
+            &dir,
+            &app.state::<AppState>().translator,
+            &uuid,
+            &article,
+            &direction,
+            texts,
+        )
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Arquivo .zim passado na linha de comando (clique duplo / associação).
@@ -734,6 +849,15 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .manage(AppState::default())
+        .setup(|app| {
+            // modelos de tradução saem da RAM depois de um tempo sem uso
+            let handle = app.handle().clone();
+            std::thread::spawn(move || loop {
+                std::thread::sleep(std::time::Duration::from_secs(60));
+                handle.state::<AppState>().translator.evict_idle();
+            });
+            Ok(())
+        })
         .register_uri_scheme_protocol("zim", |ctx, request| {
             let state = ctx.app_handle().state::<AppState>();
             serve(&state, &request)
@@ -750,7 +874,13 @@ pub fn run() {
             fulltext_search,
             create_zim,
             create_zim_from_site,
-            cancel_create_zim
+            cancel_create_zim,
+            translate_status,
+            translate_download,
+            translate_cancel_download,
+            translate_remove,
+            translate_prepare,
+            translate_texts
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o LocalZIM");

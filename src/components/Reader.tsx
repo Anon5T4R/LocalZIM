@@ -3,18 +3,28 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import {
+  DirectionStatus,
   FtEvent,
   FtHit,
   FtStatus,
+  Lang,
   Suggestion,
+  TranslateModelEvent,
   ZimInfo,
   fulltextBuild,
   fulltextCancel,
   fulltextSearch,
   fulltextStatus,
+  translateCancelDownload,
+  translateDownload,
+  translatePrepare,
+  translateRemove,
+  translateStatus,
+  translateTexts,
   zimRandom,
   zimSuggest,
 } from "../lib/backend";
+import { LANG_NAMES, LEG_NAMES, guessLang } from "../lib/lang";
 import { pathFromHref, zimUrl } from "../lib/paths";
 
 export interface NavTarget {
@@ -34,6 +44,11 @@ interface Props {
 
 const ZOOM_MIN = 50;
 const ZOOM_MAX = 300;
+
+/** Blocos por chamada ao backend — pequeno o bastante pra progresso fluido. */
+const TR_BATCH = 8;
+
+const fmtMB = (bytes: number) => `${Math.max(1, Math.round(bytes / 1e6))} MB`;
 
 export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onLoaded }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
@@ -58,6 +73,35 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
   const [findOpen, setFindOpen] = useState(false);
   const [findQ, setFindQ] = useState("");
   const findRef = useRef<HTMLInputElement>(null);
+
+  // tradução offline
+  const [trOpen, setTrOpen] = useState(false);
+  const [trTgt, setTrTgt] = useState<Lang>(() => {
+    const v = localStorage.getItem("localzim.translate.tgt");
+    return v === "pt" || v === "es" || v === "en" ? v : "pt";
+  });
+  const [trSrcOverride, setTrSrcOverride] = useState<Lang | "auto">("auto");
+  const [pageLang, setPageLang] = useState("");
+  const [trStatus, setTrStatus] = useState<DirectionStatus | null>(null);
+  const [trPhase, setTrPhase] = useState<"idle" | "loading" | "translating" | "done">("idle");
+  const [trProgress, setTrProgress] = useState({ done: 0, total: 0 });
+  const [trShowOrig, setTrShowOrig] = useState(false);
+  const [trAuto, setTrAuto] = useState(() => localStorage.getItem("localzim.translate.auto") === "1");
+  const [trError, setTrError] = useState<string | null>(null);
+  const [trDl, setTrDl] = useState<Record<string, { received: number; total: number }>>({});
+  const trRun = useRef(0);
+  const trBlocksResolve = useRef<((texts: string[]) => void) | null>(null);
+  const currentPath = useRef<string>("");
+
+  const trSrc: Lang | null =
+    trSrcOverride !== "auto" ? trSrcOverride : guessLang(pageLang) ?? guessLang(active.language);
+  const trDirection = trSrc && trSrc !== trTgt ? `${trSrc}-${trTgt}` : null;
+  const trDirectionRef = useRef(trDirection);
+  trDirectionRef.current = trDirection;
+  const trAutoRef = useRef(trAuto);
+  trAutoRef.current = trAuto;
+  const trStatusRef = useRef(trStatus);
+  trStatusRef.current = trStatus;
 
   // busca no texto completo
   const [ftOpen, setFtOpen] = useState(false);
@@ -115,6 +159,124 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
     if (st?.state === "ready") runFtSearch(qq);
   };
 
+  // ---------- tradução ----------
+
+  const refreshTrStatus = async (direction: string | null) => {
+    if (!direction) {
+      setTrStatus(null);
+      return;
+    }
+    const st = await translateStatus(direction).catch(() => null);
+    setTrStatus(st);
+  };
+
+  /** Pede os blocos de texto da página pra ponte e espera a resposta. */
+  const collectBlocks = () =>
+    new Promise<string[]>((resolve, reject) => {
+      trBlocksResolve.current = resolve;
+      postToFrame({ type: "zim:collect" });
+      setTimeout(() => {
+        if (trBlocksResolve.current === resolve) {
+          trBlocksResolve.current = null;
+          reject(new Error("a página não respondeu"));
+        }
+      }, 4000);
+    });
+
+  const startTranslate = async () => {
+    const direction = trDirectionRef.current;
+    if (!direction) return;
+    const run = ++trRun.current;
+    setTrError(null);
+    setTrShowOrig(false);
+    setTrPhase("loading");
+    try {
+      await translatePrepare(direction);
+      if (run !== trRun.current) return;
+      const texts = await collectBlocks();
+      if (run !== trRun.current) return;
+      if (texts.length === 0) {
+        setTrPhase("done");
+        setTrProgress({ done: 0, total: 0 });
+        return;
+      }
+      setTrPhase("translating");
+      setTrProgress({ done: 0, total: texts.length });
+      const article = currentPath.current;
+      for (let i = 0; i < texts.length; i += TR_BATCH) {
+        if (run !== trRun.current) return;
+        const out = await translateTexts(active.id, article, direction, texts.slice(i, i + TR_BATCH));
+        if (run !== trRun.current) return;
+        postToFrame({ type: "zim:apply", from: i, texts: out });
+        setTrProgress({ done: Math.min(i + TR_BATCH, texts.length), total: texts.length });
+      }
+      setTrPhase("done");
+    } catch (e) {
+      if (run === trRun.current) {
+        setTrError(String(e));
+        setTrPhase("idle");
+      }
+    }
+  };
+  const startTranslateRef = useRef(startTranslate);
+  startTranslateRef.current = startTranslate;
+
+  const cancelTranslate = () => {
+    trRun.current += 1;
+    setTrPhase("idle");
+  };
+
+  const toggleOriginal = () => {
+    const on = !trShowOrig;
+    setTrShowOrig(on);
+    postToFrame({ type: "zim:original", on });
+  };
+
+  const downloadMissing = () => {
+    setTrError(null);
+    for (const l of trStatus?.legs ?? []) {
+      if (!l.installed && !l.downloading) translateDownload(l.leg).catch((e) => setTrError(String(e)));
+    }
+  };
+
+  const removeLeg = async (leg: string) => {
+    await translateRemove(leg).catch(() => {});
+    refreshTrStatus(trDirectionRef.current);
+  };
+
+  useEffect(() => {
+    localStorage.setItem("localzim.translate.tgt", trTgt);
+  }, [trTgt]);
+  useEffect(() => {
+    localStorage.setItem("localzim.translate.auto", trAuto ? "1" : "0");
+  }, [trAuto]);
+
+  // status dos modelos acompanha a direção (e o painel aberto)
+  useEffect(() => {
+    if (trOpen) refreshTrStatus(trDirection);
+  }, [trOpen, trDirection]);
+
+  // progresso de download dos modelos
+  useEffect(() => {
+    const un = listen<TranslateModelEvent>("translate-model", (e) => {
+      const p = e.payload;
+      if (p.state === "downloading") {
+        setTrDl((m) => ({ ...m, [p.leg]: { received: p.received ?? 0, total: p.total ?? 0 } }));
+        return;
+      }
+      setTrDl((m) => {
+        const n = { ...m };
+        delete n[p.leg];
+        return n;
+      });
+      if (p.state === "error" && p.error) setTrError(p.error);
+      refreshTrStatus(trDirectionRef.current);
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, []);
+
   // ações dos atalhos — vindas da ponte no artigo ou do teclado no app
   const keyAction = (k: string) => {
     if (k === "back") history.back();
@@ -153,6 +315,12 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
     setFtResults(null);
     setFtQuery("");
     setFindOpen(false);
+    trRun.current += 1;
+    setTrOpen(false);
+    setTrPhase("idle");
+    setTrShowOrig(false);
+    setTrError(null);
+    setTrSrcOverride("auto");
   }, [active.id]);
 
   // tema do artigo acompanha o tema do app
@@ -169,12 +337,17 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
         title?: string;
         url?: string;
         key?: string;
+        lang?: string;
+        texts?: string[];
       };
       if (d.type === "zim:loaded") {
         const parsed = pathFromHref(String(d.href ?? ""));
         const t = String(d.title ?? "");
         setTitle(t);
-        if (parsed) onLoadedRef.current(parsed.id, parsed.path, t);
+        if (parsed) {
+          currentPath.current = parsed.path;
+          onLoadedRef.current(parsed.id, parsed.path, t);
+        }
         const w = iframeRef.current?.contentWindow;
         if (w) {
           w.postMessage({ type: "zim:zoom", value: String(zoomRef.current / 100) }, "*");
@@ -183,6 +356,22 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
         getCurrentWindow()
           .setTitle(t ? `${t} — LocalZIM` : "LocalZIM")
           .catch(() => {});
+        // página nova: estado de tradução recomeça do zero
+        setPageLang(String(d.lang ?? ""));
+        trRun.current += 1;
+        setTrPhase("idle");
+        setTrShowOrig(false);
+        setTrError(null);
+        if (
+          trAutoRef.current &&
+          trDirectionRef.current &&
+          trStatusRef.current?.legs.every((l) => l.installed)
+        ) {
+          startTranslateRef.current();
+        }
+      } else if (d.type === "zim:blocks") {
+        trBlocksResolve.current?.(Array.isArray(d.texts) ? d.texts.map(String) : []);
+        trBlocksResolve.current = null;
       } else if (d.type === "zim:external" && d.url) {
         openUrl(String(d.url)).catch(() => {});
       } else if (d.type === "zim:key" && d.key) {
@@ -357,6 +546,13 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
         >
           🔍
         </button>
+        <button
+          className={trOpen || trPhase === "done" ? "tb tb-on" : "tb"}
+          onClick={() => setTrOpen((o) => !o)}
+          title="Traduzir página (offline)"
+        >
+          🌐
+        </button>
         <button className="tb" onClick={onToggleDark} title="Alternar tema claro/escuro">
           {dark ? "☀️" : "🌙"}
         </button>
@@ -392,6 +588,169 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
             <button className="tb" onClick={() => setFindOpen(false)} title="Fechar (Esc)">
               ✕
             </button>
+          </div>
+        )}
+
+        {trOpen && (
+          <div className="ftpanel trpanel">
+            <div className="ft-head">
+              <div className="ft-title">Tradução offline</div>
+              <button className="tb" onClick={() => setTrOpen(false)} title="Fechar">
+                ✕
+              </button>
+            </div>
+
+            <div className="tr-langs">
+              <span className="tr-label">Traduzir para</span>
+              <div className="tr-seg">
+                {(Object.keys(LANG_NAMES) as Lang[]).map((l) => (
+                  <button
+                    key={l}
+                    className={trTgt === l ? "seg sel" : "seg"}
+                    onClick={() => setTrTgt(l)}
+                  >
+                    {LANG_NAMES[l]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="tr-langs">
+              <span className="tr-label">Idioma do artigo</span>
+              <select
+                className="tr-src"
+                value={trSrcOverride}
+                onChange={(e) => setTrSrcOverride(e.target.value as Lang | "auto")}
+              >
+                <option value="auto">
+                  {trSrcOverride === "auto" && trSrc
+                    ? `Detectado: ${LANG_NAMES[trSrc]}`
+                    : "Detectar automaticamente"}
+                </option>
+                {(Object.keys(LANG_NAMES) as Lang[]).map((l) => (
+                  <option key={l} value={l}>
+                    {LANG_NAMES[l]}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {!trSrc && (
+              <div className="ft-block">
+                Não deu pra detectar o idioma deste artigo — escolha acima. A tradução
+                funciona entre português, espanhol e inglês.
+              </div>
+            )}
+            {trSrc && trSrc === trTgt && (
+              <div className="ft-block">O artigo já está em {LANG_NAMES[trTgt]}.</div>
+            )}
+
+            {trDirection && trStatus && !trStatus.legs.every((l) => l.installed) && (
+              <div className="ft-block">
+                <p>
+                  Primeira vez nesta direção: o LocalZIM baixa o modelo de tradução{" "}
+                  <strong>uma única vez</strong> e depois funciona 100% offline.
+                  {trStatus.legs.length > 1 && (
+                    <> Português ↔ espanhol passa pelo inglês, então são dois modelos.</>
+                  )}
+                </p>
+                {trStatus.legs.filter((l) => !l.installed).map((l) => {
+                  const dl = trDl[l.leg];
+                  return (
+                    <div key={l.leg} className="tr-leg">
+                      <span className="tr-leg-name">
+                        {LEG_NAMES[l.leg] ?? l.leg} · {fmtMB(l.bytes)}
+                      </span>
+                      {dl ? (
+                        <>
+                          <div className="ft-progress">
+                            <div
+                              style={{
+                                width: `${dl.total ? (dl.received / dl.total) * 100 : 0}%`,
+                              }}
+                            />
+                          </div>
+                          <button
+                            className="ghost"
+                            onClick={() => translateCancelDownload(l.leg)}
+                          >
+                            Cancelar
+                          </button>
+                        </>
+                      ) : l.downloading ? (
+                        <span className="tr-muted">preparando…</span>
+                      ) : null}
+                    </div>
+                  );
+                })}
+                {!trStatus.legs.some((l) => l.downloading || trDl[l.leg]) && (
+                  <button className="primary" onClick={downloadMissing}>
+                    Baixar {trStatus.legs.filter((l) => !l.installed).length > 1 ? "modelos" : "modelo"}{" "}
+                    ({fmtMB(
+                      trStatus.legs.filter((l) => !l.installed).reduce((s, l) => s + l.bytes, 0)
+                    )})
+                  </button>
+                )}
+              </div>
+            )}
+
+            {trDirection && trStatus?.legs.every((l) => l.installed) && (
+              <div className="ft-block">
+                {trPhase === "idle" && (
+                  <button className="primary" onClick={() => startTranslateRef.current()}>
+                    Traduzir página
+                  </button>
+                )}
+                {trPhase === "loading" && <p>Carregando modelo…</p>}
+                {trPhase === "translating" && (
+                  <>
+                    <p>
+                      Traduzindo… {trProgress.done}/{trProgress.total} blocos
+                    </p>
+                    <div className="ft-progress">
+                      <div
+                        style={{
+                          width: `${trProgress.total ? (trProgress.done / trProgress.total) * 100 : 0}%`,
+                        }}
+                      />
+                    </div>
+                    <button className="ghost" onClick={cancelTranslate}>
+                      Parar
+                    </button>
+                  </>
+                )}
+                {trPhase === "done" && (
+                  <>
+                    <p>✓ Página traduzida (fica em cache — voltar aqui é instantâneo).</p>
+                    <button className="ghost" onClick={toggleOriginal}>
+                      {trShowOrig ? "Ver tradução" : "Ver original"}
+                    </button>
+                  </>
+                )}
+                <label className="tr-auto">
+                  <input
+                    type="checkbox"
+                    checked={trAuto}
+                    onChange={(e) => setTrAuto(e.target.checked)}
+                  />
+                  Traduzir as próximas páginas automaticamente
+                </label>
+                <div className="tr-manage">
+                  {trStatus.legs.map((l) => (
+                    <button
+                      key={l.leg}
+                      className="tr-remove"
+                      title={`Apagar o modelo ${LEG_NAMES[l.leg] ?? l.leg} do disco (${fmtMB(l.bytes)})`}
+                      onClick={() => removeLeg(l.leg)}
+                    >
+                      🗑 {LEG_NAMES[l.leg] ?? l.leg}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {trError && <div className="ft-block tr-error">{trError}</div>}
           </div>
         )}
 
