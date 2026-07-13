@@ -131,8 +131,9 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
   const [sTitle, setSTitle] = useState("");
   const [sDesc, setSDesc] = useState("");
   const [sLang, setSLang] = useState("por");
-  const [sDepth, setSDepth] = useState("3");
-  const [sMaxPages, setSMaxPages] = useState("200");
+  const [sDepth, setSDepth] = useState("100");
+  const [sMaxPages, setSMaxPages] = useState("2000");
+  const [sSamePath, setSSamePath] = useState(true);
 
   const pickSiteOutput = async () => {
     const sel = await saveDialog({
@@ -165,8 +166,9 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
         title: sTitle.trim() || hostOf(sUrl) || "Site",
         description: sDesc,
         language: sLang,
-        maxDepth: Math.max(0, parseInt(sDepth, 10) || 3),
-        maxPages: Math.max(1, parseInt(sMaxPages, 10) || 200),
+        maxDepth: Math.max(0, parseInt(sDepth, 10) || 100),
+        maxPages: Math.max(1, parseInt(sMaxPages, 10) || 2000),
+        samePath: sSamePath,
       });
     } catch (e) {
       setCState({ state: "error", progress: 0, error: String(e) });
@@ -313,9 +315,10 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <h3>Criar .zim de um site</h3>
             <p className="modal-hint">
-              Crawler local: baixa as páginas do <strong>mesmo domínio</strong> (respeitando o
-              robots.txt) com imagens, CSS e scripts, reescreve os links e empacota. Funciona bem
-              pra documentação, blogs e wikis; sites montados por JavaScript (SPA) podem sair
+              Crawler local: baixa as páginas a partir da URL inicial (respeitando o robots.txt)
+              com imagens, CSS e scripts, reescreve os links e empacota. Acha capítulos listados
+              em JS de navegação (docs mdBook, ex.: o livro do Rust). Funciona bem pra
+              documentação, blogs e wikis; sites montados por JavaScript (SPA) podem sair
               incompletos — pra esses, use o{" "}
               <a
                 href="https://github.com/openzim/zimit"
@@ -365,6 +368,16 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
               <label>Descrição</label>
               <input value={sDesc} onChange={(e) => setSDesc(e.target.value)} disabled={building} />
             </div>
+            <label className="form-check">
+              <input
+                type="checkbox"
+                checked={sSamePath}
+                onChange={(e) => setSSamePath(e.target.checked)}
+                disabled={building}
+              />
+              Baixar só o que está dentro do caminho inicial (ex.: começou em{" "}
+              <code>/book/</code>, não sai dele) — recomendado
+            </label>
             <div className="form-grid">
               <div className="form-row">
                 <label>Profundidade de links</label>

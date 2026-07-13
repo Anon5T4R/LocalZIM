@@ -33,6 +33,10 @@ pub struct CrawlSpec {
     pub max_depth: u32,
     pub max_pages: u32,
     pub delay_ms: u64,
+    /// Só baixa páginas cujo caminho está dentro do diretório da URL inicial
+    /// (ex.: começou em /book/ ⇒ nada de /std/). O prefixo é calculado da URL
+    /// final da primeira página, então redirect tipo /book → /book/ funciona.
+    pub same_path: bool,
 }
 
 pub struct CrawlOutcome {
@@ -414,8 +418,10 @@ pub fn crawl(
         return Err("A URL precisa começar com http:// ou https://".into());
     }
     let main_host = start.host_str().ok_or("URL sem host")?.to_lowercase();
-    let max_pages = spec.max_pages.clamp(1, 5000);
-    let max_depth = spec.max_depth.min(10);
+    let max_pages = spec.max_pages.clamp(1, 20000);
+    // com restrição de caminho a profundidade alta é segura (docs mdBook são
+    // correntes de "próximo capítulo" com centenas de elos)
+    let max_depth = spec.max_depth.min(if spec.same_path { 1000 } else { 10 });
     let delay = Duration::from_millis(spec.delay_ms.min(5000));
 
     let client = Client::builder()
@@ -447,6 +453,8 @@ pub fn crawl(
     let mut pages = 0u32;
     let mut files = 0u32;
     let mut main_local: Option<String> = None;
+    // diretório da 1ª página (com same_path); None até ela chegar
+    let mut path_prefix: Option<String> = None;
 
     seen.insert(start.as_str().to_string());
     queue.push_back((start.clone(), Kind::Page(0)));
@@ -532,6 +540,9 @@ pub fn crawl(
             pages += 1;
             if main_local.is_none() {
                 main_local = Some(local.clone());
+                if spec.same_path {
+                    path_prefix = Some(dir_prefix(final_url.path()));
+                }
             }
             let depth = match kind {
                 Kind::Page(d) => d,
@@ -540,8 +551,9 @@ pub fn crawl(
             let (links, assets) = extract_links(&String::from_utf8_lossy(&body), &final_url);
             if depth < max_depth {
                 for l in links {
-                    let same_host = l.host_str().map(|h| h.to_lowercase()) == Some(main_host.clone());
-                    if same_host && seen.insert(l.as_str().to_string()) {
+                    if page_in_scope(&l, &main_host, &path_prefix)
+                        && seen.insert(l.as_str().to_string())
+                    {
                         queue.push_back((l, Kind::Page(depth + 1)));
                     }
                 }
@@ -560,6 +572,21 @@ pub fn crawl(
                 }
             }
             csses.push((local, final_url.clone()));
+        } else if (ct.contains("javascript") || final_url.path().to_lowercase().ends_with(".js"))
+            && final_url.host_str().map(|h| h.to_lowercase()) == Some(main_host.clone())
+        {
+            // Navegação montada por JS (toc.js do mdBook e similares): strings
+            // "….html" no arquivo viram candidatas a página. Conservador — só
+            // mesmo host e, com same_path, só dentro do prefixo.
+            if max_depth >= 1 {
+                for r in js_page_refs(&String::from_utf8_lossy(&body), &final_url) {
+                    if page_in_scope(&r, &main_host, &path_prefix)
+                        && seen.insert(r.as_str().to_string())
+                    {
+                        queue.push_back((r, Kind::Page(1)));
+                    }
+                }
+            }
         }
 
         on_progress(CrawlProgress {
@@ -593,6 +620,69 @@ pub fn crawl(
         pages,
         files,
     })
+}
+
+/// Diretório de um caminho de URL: "/book/ch01.html" → "/book/", "/book/" →
+/// "/book/", "/" → "/".
+fn dir_prefix(path: &str) -> String {
+    match path.rfind('/') {
+        Some(i) => path[..=i].to_string(),
+        None => "/".to_string(),
+    }
+}
+
+/// Página entra no crawl? Mesmo host e, com same_path, dentro do prefixo.
+fn page_in_scope(l: &Url, main_host: &str, prefix: &Option<String>) -> bool {
+    l.host_str().map(|h| h.to_lowercase()).as_deref() == Some(main_host)
+        && prefix
+            .as_deref()
+            .map(|p| l.path().starts_with(p))
+            .unwrap_or(true)
+}
+
+/// Candidatas a página dentro de um JS de navegação (toc.js do mdBook e
+/// afins): cada ocorrência de `.html`/`.htm` expandida pra trás enquanto
+/// forem caracteres válidos de caminho. Funciona mesmo com o HTML embutido
+/// em strings JS ('<a href="ch01.html">'), onde parsear por pares de aspas
+/// falharia por causa do aninhamento.
+pub fn js_page_refs(js: &str, base: &Url) -> Vec<Url> {
+    fn path_char(c: char) -> bool {
+        c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.' | '/' | ':' | '%' | '~' | '+')
+    }
+    let mut out = Vec::new();
+    let lower = js.to_ascii_lowercase();
+    let mut i = 0;
+    while let Some(p) = lower[i..].find(".htm") {
+        let dot = i + p;
+        // fim do token: ".html" ou ".htm"
+        let end = if lower[dot..].starts_with(".html") { dot + 5 } else { dot + 4 };
+        i = end;
+        // o que vem depois precisa fechar o token (aspas, fragmento, fim…)
+        if js[end..]
+            .chars()
+            .next()
+            .map(|c| path_char(c) && c != '/')
+            .unwrap_or(false)
+        {
+            continue;
+        }
+        // expande pra trás
+        let mut start = dot;
+        for (idx, c) in js[..dot].char_indices().rev() {
+            if path_char(c) {
+                start = idx;
+            } else {
+                break;
+            }
+        }
+        let token = &js[start..end];
+        if token.len() <= 300 && !token.starts_with('.') {
+            if let Some(u) = resolve(base, token) {
+                out.push(u);
+            }
+        }
+    }
+    out
 }
 
 /// URLs referenciadas por um CSS (url() e @import).
@@ -737,6 +827,127 @@ mod tests {
     }
 
     #[test]
+    fn prefixo_de_diretorio() {
+        assert_eq!(dir_prefix("/book/ch01.html"), "/book/");
+        assert_eq!(dir_prefix("/book/"), "/book/");
+        assert_eq!(dir_prefix("/"), "/");
+        assert_eq!(dir_prefix(""), "/");
+    }
+
+    #[test]
+    fn paginas_dentro_de_js_de_navegacao() {
+        let base = u("https://site.com/book/toc.js");
+        let js = r#"var toc='<a href="ch01-00.html">1</a><a href="ch02-01.html#x">2</a>';
+            var nada="tem espaco .html"; var css="print.css"; var abs="/book/apx.html";"#;
+        let refs: Vec<String> = js_page_refs(js, &base).iter().map(|u| u.to_string()).collect();
+        assert!(refs.contains(&"https://site.com/book/ch01-00.html".to_string()), "{refs:?}");
+        assert!(refs.contains(&"https://site.com/book/ch02-01.html".to_string()));
+        assert!(refs.contains(&"https://site.com/book/apx.html".to_string()));
+        assert_eq!(refs.iter().filter(|r| r.contains("espaco") || r.contains(".css")).count(), 0);
+    }
+
+    /// Servidor imitando um mdBook: sumário só via toc.js, capítulos em
+    /// corrente (next), e um link escapando do /docs/ que não pode entrar.
+    fn serve_mdbook() -> u16 {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut s) = stream else { continue };
+                let mut buf = [0u8; 2048];
+                let n = std::io::Read::read(&mut s, &mut buf).unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]);
+                let path = req.split_whitespace().nth(1).unwrap_or("/").to_string();
+                let (ct, body): (&str, Vec<u8>) = match path.as_str() {
+                    "/docs/" => ("text/html", b"<html><head><script src=\"toc.js\"></script></head><body>capa <a href=\"ch1.html\">comecar</a> <a href=\"/fora/leak.html\">fora</a></body></html>".to_vec()),
+                    "/docs/toc.js" => ("application/javascript", b"var t='<a href=\"ch1.html\">1</a><a href=\"ch2.html\">2</a><a href=\"ch3.html\">3</a>';".to_vec()),
+                    "/docs/ch1.html" => ("text/html", b"<html><body>um <a href=\"ch2.html\">next</a></body></html>".to_vec()),
+                    "/docs/ch2.html" => ("text/html", b"<html><body>dois <a href=\"ch3.html\">next</a></body></html>".to_vec()),
+                    "/docs/ch3.html" => ("text/html", b"<html><body>fim</body></html>".to_vec()),
+                    "/fora/leak.html" => ("text/html", b"<html><body>nao era pra eu entrar</body></html>".to_vec()),
+                    _ => ("text/html", b"<html><body>404</body></html>".to_vec()),
+                };
+                let _ = write!(
+                    s,
+                    "HTTP/1.1 200 OK\r\nContent-Type: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    ct,
+                    body.len()
+                );
+                let _ = s.write_all(&body);
+            }
+        });
+        port
+    }
+
+    #[test]
+    fn crawl_mdbook_respeita_caminho_e_descobre_toc_js() {
+        let port = serve_mdbook();
+        let staging = std::env::temp_dir().join(format!("localzim-mdbook-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&staging);
+
+        let spec = CrawlSpec {
+            start_url: format!("http://127.0.0.1:{port}/docs/"),
+            max_depth: 500,
+            max_pages: 100,
+            delay_ms: 0,
+            same_path: true,
+        };
+        let cancel = AtomicBool::new(false);
+        let out = crawl(&spec, &staging, &cancel, |_| {}).unwrap();
+        // capa + 3 capítulos (descobertos pelo toc.js E pela corrente)
+        assert_eq!(out.pages, 4, "páginas: {}", out.pages);
+        assert!(staging.join("docs/ch1.html").exists());
+        assert!(staging.join("docs/ch2.html").exists());
+        assert!(staging.join("docs/ch3.html").exists());
+        assert!(staging.join("docs/toc.js").exists(), "toc.js baixado como asset");
+        // fora do /docs/ não entra, mesmo sendo o mesmo host
+        assert!(!staging.join("fora").exists(), "vazou do caminho inicial");
+
+        let _ = fs::remove_dir_all(&staging);
+    }
+
+    /// Contra o livro real (não roda no CI): LOCALZIM_TEST_CRAWL_BOOK=1.
+    #[test]
+    fn crawl_do_rust_book_real_pega_todos_os_capitulos() {
+        if std::env::var("LOCALZIM_TEST_CRAWL_BOOK").is_err() {
+            eprintln!("LOCALZIM_TEST_CRAWL_BOOK não definido — teste pulado");
+            return;
+        }
+        let staging = std::env::temp_dir().join(format!("localzim-book-test-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&staging);
+        let spec = CrawlSpec {
+            start_url: "https://doc.rust-lang.org/book/".into(),
+            max_depth: 500,
+            max_pages: 400,
+            delay_ms: 50,
+            same_path: true,
+        };
+        let cancel = AtomicBool::new(false);
+        let out = crawl(&spec, &staging, &cancel, |p| {
+            if p.pages % 25 == 0 {
+                eprintln!("páginas: {} (fila {})", p.pages, p.queued);
+            }
+        })
+        .unwrap();
+        eprintln!("total: {} páginas, {} arquivos", out.pages, out.files);
+        assert!(out.pages >= 100, "esperava >=100 páginas, veio {}", out.pages);
+        // do começo ao fim do livro (o que faltava no crawl antigo)
+        for f in [
+            "book/title-page.html",
+            "book/appendix-01-keywords.html",
+            "book/appendix-07-nightly-rust.html",
+        ] {
+            assert!(staging.join(f).exists(), "faltou {f}");
+        }
+        if !staging.join("book/toc.js").exists() {
+            eprintln!("aviso: sem toc.js (sumário deve ser inline nesta versão do mdBook)");
+        }
+        // nada da std
+        assert!(!staging.join("std").exists(), "vazou pra std");
+        let _ = fs::remove_dir_all(&staging);
+    }
+
+    #[test]
     fn crawl_de_ponta_a_ponta_com_servidor_local() {
         let port = serve_site();
         let staging = std::env::temp_dir().join(format!("localzim-crawl-test-{}", std::process::id()));
@@ -747,6 +958,7 @@ mod tests {
             max_depth: 3,
             max_pages: 50,
             delay_ms: 0,
+            same_path: false,
         };
         let cancel = AtomicBool::new(false);
         let out = crawl(&spec, &staging, &cancel, |_| {}).unwrap();

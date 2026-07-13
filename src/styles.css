@@ -771,6 +771,20 @@ button:disabled {
   gap: 0 12px;
 }
 
+.form-check {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 8px 0 10px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.form-check code {
+  font-size: 12px;
+}
+
 .modal-actions {
   display: flex;
   gap: 8px;

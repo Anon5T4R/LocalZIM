@@ -42,12 +42,14 @@ Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust). Licença MIT
   (streaming: vídeo grande não passa pela RAM), md5 no rodapé. Abre no LocalZIM e no Kiwix.
   Para rastrear um site da internet o [zimit](https://github.com/openzim/zimit) continua sendo
   a ferramenta certa; o criador local é o caminho rápido quando você já tem os arquivos.
-- **Criar .zim de um site** (`src-tauri/src/crawler.rs`): crawler estático local — BFS no mesmo
-  domínio com limite de profundidade/páginas, respeita robots.txt, intervalo educado entre
-  requisições, baixa CSS/JS/imagens/fontes (inclusive de CDN, em `_ext/`), segue `url()` e
-  `@import` dos CSS e reescreve todos os links pra caminhos relativos (externos ficam absolutos
-  e abrem no navegador). Ótimo pra documentação, blogs e wikis; sites montados por JavaScript
-  (SPA) podem sair incompletos — pra esses, zimit.
+- **Criar .zim de um site** (`src-tauri/src/crawler.rs`): crawler estático local — BFS com
+  limite de profundidade/páginas, por padrão **restrito ao caminho da URL inicial** (começou em
+  `/book/`, não sai dele; desmarcável pra pegar o domínio todo), respeita robots.txt, intervalo
+  educado entre requisições, baixa CSS/JS/imagens/fontes (inclusive de CDN, em `_ext/`), segue
+  `url()` e `@import` dos CSS, **descobre capítulos listados em JS de navegação** (o `toc.js`
+  dos mdBook — livro do Rust etc.) e reescreve todos os links pra caminhos relativos (externos
+  ficam absolutos e abrem no navegador). Ótimo pra documentação, blogs e wikis; sites montados
+  por JavaScript (SPA) podem sair incompletos — pra esses, zimit.
 
 ## Tradução offline (pt-BR · es · en)
 

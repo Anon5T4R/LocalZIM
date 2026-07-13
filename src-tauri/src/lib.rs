@@ -526,6 +526,9 @@ struct CrawlZimSpec {
     max_pages: Option<u32>,
     #[serde(default)]
     delay_ms: Option<u64>,
+    /// Só páginas dentro do diretório da URL inicial (padrão: sim).
+    #[serde(default)]
+    same_path: Option<bool>,
 }
 
 /// Baixa um site (crawler estático, mesmo host, robots.txt respeitado) e
@@ -566,6 +569,7 @@ async fn create_zim_from_site(
             max_depth: spec.max_depth.unwrap_or(3),
             max_pages: spec.max_pages.unwrap_or(200),
             delay_ms: spec.delay_ms.unwrap_or(200),
+            same_path: spec.same_path.unwrap_or(true),
         };
         let max_pages = cspec.max_pages.max(1);
         let _ = app.emit(

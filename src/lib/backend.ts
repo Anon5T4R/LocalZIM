@@ -82,6 +82,8 @@ export interface CrawlZimSpec {
   maxDepth?: number;
   maxPages?: number;
   delayMs?: number;
+  /** Só baixa páginas dentro do diretório da URL inicial (padrão: true). */
+  samePath?: boolean;
 }
 
 export const createZim = (spec: CreateZimSpec) => invoke<void>("create_zim", { spec });
