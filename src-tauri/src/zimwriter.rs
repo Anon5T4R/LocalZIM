@@ -1,10 +1,12 @@
 //! Criador de arquivos ZIM a partir de uma pasta local (estilo zimwriterfs).
 //!
-//! Escreve o esquema de namespaces clássico (A = artigos, I = recursos,
-//! M = metadados, '-' = favicon), clusters zstd para texto e sem compressão
-//! para mídia (streaming — arquivo grande não passa inteiro pela RAM),
-//! listas de ponteiros ordenadas e md5 no rodapé. O resultado abre no
-//! próprio LocalZIM e no Kiwix.
+//! Escreve o esquema NOVO de namespaces (minor 1): todo o conteúdo — páginas
+//! e recursos — vai junto no namespace C, então links relativos entre página
+//! e CSS/imagem funcionam por construção (no esquema clássico A/I, uma página
+//! em A/x.html que pede css/y.css cai em A/css/y.css e dá 404). Metadados em
+//! M, clusters zstd para texto e sem compressão para mídia (streaming —
+//! arquivo grande não passa inteiro pela RAM), listas ordenadas e md5 no
+//! rodapé. O resultado abre no próprio LocalZIM e no Kiwix.
 
 use md5::{Digest, Md5};
 use std::collections::HashMap;
@@ -222,7 +224,7 @@ pub fn create(
         let ext = rel.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
         let (mime, _) = mime_for(&ext);
         let is_html = mime == "text/html";
-        let ns = if is_html { b'A' } else { b'I' };
+        let ns = b'C'; // esquema novo: páginas e recursos juntos
         let fname = rel.rsplit('/').next().unwrap_or(rel).to_string();
         let title = if is_html {
             articles += 1;
@@ -307,14 +309,17 @@ pub fn create(
                 }
             }
         }
-        entries.push(NewEntry {
-            ns: b'-',
-            url: "favicon".into(),
-            title: String::new(),
-            kind: NewKind::Redirect {
-                target: (b'I', fav.clone()),
-            },
-        });
+        // atalho C/favicon → arquivo real (só se o nome não colide com um arquivo)
+        if !files.iter().any(|(r, _, _)| r == "favicon") {
+            entries.push(NewEntry {
+                ns: b'C',
+                url: "favicon".into(),
+                title: String::new(),
+                kind: NewKind::Redirect {
+                    target: (b'C', fav.clone()),
+                },
+            });
+        }
     }
 
     // 3) Ordena por (ns, url) e resolve índices
@@ -337,7 +342,7 @@ pub fn create(
             }
         }
     };
-    let main_idx = find_idx(b'A', &main_rel, &entries)
+    let main_idx = find_idx(b'C', &main_rel, &entries)
         .ok_or_else(|| format!("Página inicial '{main_rel}' não encontrada na pasta"))?;
 
     // 4) Atribui clusters: zstd pra texto, cru pra mídia, agrupando até 2 MiB.
@@ -450,7 +455,7 @@ pub fn create(
     let mut head = W(Vec::with_capacity(clusters_start as usize));
     head.u32(MAGIC);
     head.u16(6); // major
-    head.u16(0); // minor: esquema clássico
+    head.u16(1); // minor: esquema novo de namespaces (conteúdo em C)
     // UUID: md5 do caminho de saída + data (estável o suficiente, sem dep nova)
     let uuid: [u8; 16] = Md5::digest(format!("{}|{}", output.display(), spec.title).as_bytes()).into();
     head.0.extend_from_slice(&uuid);
@@ -648,17 +653,19 @@ mod tests {
 
         // Round-trip: o próprio parser do LocalZIM lê o arquivo criado
         let z = ZimFile::open(&out).unwrap();
-        assert_eq!(z.main_path().unwrap(), "A/index.html");
+        assert_eq!(z.article_namespace(), b'C', "esquema novo (minor 1)");
+        assert_eq!(z.main_path().unwrap(), "C/index.html");
         let (mime, body) = z
-            .content(&z.find(b'A', "sub/pagina.html").unwrap().unwrap().1)
+            .content(&z.find(b'C', "sub/pagina.html").unwrap().unwrap().1)
             .unwrap()
             .unwrap();
         assert_eq!(mime, "text/html");
         assert!(String::from_utf8_lossy(&body).contains("Conteúdo interno"));
 
-        // CSS em cluster zstd, favicon em cluster cru
+        // REGRESSÃO: página e recurso têm que viver no MESMO namespace —
+        // "C/index.html" pedindo "estilo.css" relativo cai em "C/estilo.css".
         let (mime, body) = z
-            .content(&z.find(b'I', "estilo.css").unwrap().unwrap().1)
+            .content(&z.find(b'C', "estilo.css").unwrap().unwrap().1)
             .unwrap()
             .unwrap();
         assert_eq!(mime, "text/css");
@@ -666,7 +673,7 @@ mod tests {
 
         // metadados + título extraído do HTML + dotdir ignorado
         assert_eq!(z.meta_string("Title").unwrap(), "Meu Site");
-        assert!(z.find(b'I', ".git/config").unwrap().is_none());
+        assert!(z.find(b'C', ".git/config").unwrap().is_none());
         let sug = z.suggest("Página", 5).unwrap();
         assert!(sug.iter().any(|(t, _)| t == "Página Dois"));
 
