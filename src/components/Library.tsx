@@ -1,7 +1,8 @@
-import { useState } from "react";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useEffect, useState } from "react";
+import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { ZimInfo } from "../lib/backend";
+import { listen } from "@tauri-apps/api/event";
+import { cancelCreateZim, createZim, ZimCreateEvent, ZimInfo } from "../lib/backend";
 import { formatBytes } from "../lib/paths";
 import { loadRecents, removeRecent, RecentBook } from "../lib/recents";
 
@@ -24,6 +25,29 @@ function metaLine(language: string, size: number, articles: number | null): stri
 export default function Library({ books, error, onOpenPath, onActivate, onCloseBook }: Props) {
   const [recents, setRecents] = useState<RecentBook[]>(loadRecents);
 
+  // criador de .zim a partir de pasta
+  const [createOpen, setCreateOpen] = useState(false);
+  const [cSource, setCSource] = useState("");
+  const [cOutput, setCOutput] = useState("");
+  const [cTitle, setCTitle] = useState("");
+  const [cDesc, setCDesc] = useState("");
+  const [cLang, setCLang] = useState("por");
+  const [cCreator, setCCreator] = useState("");
+  const [cMain, setCMain] = useState("");
+  const [cState, setCState] = useState<ZimCreateEvent | null>(null);
+
+  useEffect(() => {
+    const un = listen<ZimCreateEvent>("zim-create", (e) => {
+      setCState(e.payload);
+      if (e.payload.state === "done" && e.payload.result) {
+        onOpenPath(e.payload.result.output);
+      }
+    });
+    return () => {
+      un.then((f) => f());
+    };
+  }, [onOpenPath]);
+
   const pickFile = async () => {
     const sel = await openDialog({
       title: "Abrir arquivo ZIM",
@@ -32,6 +56,45 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
     });
     if (typeof sel === "string") onOpenPath(sel);
   };
+
+  const pickSourceDir = async () => {
+    const sel = await openDialog({ title: "Pasta com o conteúdo (HTML)", directory: true });
+    if (typeof sel === "string") {
+      setCSource(sel);
+      if (!cTitle) {
+        const name = sel.split(/[\\/]/).filter(Boolean).pop() ?? "";
+        setCTitle(name);
+      }
+    }
+  };
+
+  const pickOutput = async () => {
+    const sel = await saveDialog({
+      title: "Salvar arquivo ZIM",
+      defaultPath: `${(cTitle || "biblioteca").replace(/[\\/:*?"<>|]/g, "-")}.zim`,
+      filters: [{ name: "Arquivo ZIM", extensions: ["zim"] }],
+    });
+    if (typeof sel === "string") setCOutput(sel);
+  };
+
+  const startCreate = async () => {
+    setCState({ state: "building", progress: 0 });
+    try {
+      await createZim({
+        source: cSource,
+        output: cOutput,
+        title: cTitle.trim() || "Biblioteca",
+        description: cDesc,
+        language: cLang,
+        creator: cCreator,
+        mainPage: cMain.trim() || null,
+      });
+    } catch (e) {
+      setCState({ state: "error", progress: 0, error: String(e) });
+    }
+  };
+
+  const building = cState?.state === "building";
 
   const openPaths = new Set(books.map((b) => b.path));
   const closedRecents = recents.filter((r) => !openPaths.has(r.path));
@@ -45,9 +108,21 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
             Sua biblioteca offline — leitor de arquivos ZIM (Wikipédia, Stack Overflow, Gutenberg…)
           </p>
         </div>
-        <button className="primary" onClick={pickFile}>
-          Abrir arquivo .zim…
-        </button>
+        <div className="lib-actions">
+          <button className="primary" onClick={pickFile}>
+            Abrir arquivo .zim…
+          </button>
+          <button
+            className="secondary"
+            onClick={() => {
+              setCState(null);
+              setCreateOpen(true);
+            }}
+            title="Empacota uma pasta com HTML num arquivo .zim"
+          >
+            Criar .zim de uma pasta…
+          </button>
+        </div>
       </header>
 
       {error && <div className="error-banner">{error}</div>}
@@ -141,6 +216,115 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
           <button className="primary" onClick={pickFile}>
             Abrir arquivo .zim…
           </button>
+        </div>
+      )}
+
+      {createOpen && (
+        <div className="modal-overlay" onClick={() => !building && setCreateOpen(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Criar .zim de uma pasta</h3>
+            <p className="modal-hint">
+              Empacota uma pasta com HTML (site salvo, documentação, notas exportadas) num
+              arquivo <code>.zim</code>. Links relativos entre as páginas continuam funcionando.
+              Para capturar um site da internet, use o{" "}
+              <a
+                href="https://github.com/openzim/zimit"
+                onClick={(e) => {
+                  e.preventDefault();
+                  openUrl("https://github.com/openzim/zimit").catch(() => {});
+                }}
+              >
+                zimit
+              </a>{" "}
+              (ou <code>wget --mirror</code> e empacote aqui).
+            </p>
+
+            <div className="form-row">
+              <label>Pasta de origem</label>
+              <div className="form-pick">
+                <input value={cSource} readOnly placeholder="escolha a pasta com o conteúdo" />
+                <button onClick={pickSourceDir} disabled={building}>
+                  Escolher…
+                </button>
+              </div>
+            </div>
+            <div className="form-row">
+              <label>Salvar como</label>
+              <div className="form-pick">
+                <input value={cOutput} readOnly placeholder="destino do arquivo .zim" />
+                <button onClick={pickOutput} disabled={building}>
+                  Escolher…
+                </button>
+              </div>
+            </div>
+            <div className="form-grid">
+              <div className="form-row">
+                <label>Título</label>
+                <input value={cTitle} onChange={(e) => setCTitle(e.target.value)} disabled={building} />
+              </div>
+              <div className="form-row">
+                <label>Idioma</label>
+                <input value={cLang} onChange={(e) => setCLang(e.target.value)} disabled={building} placeholder="por" />
+              </div>
+            </div>
+            <div className="form-row">
+              <label>Descrição</label>
+              <input value={cDesc} onChange={(e) => setCDesc(e.target.value)} disabled={building} />
+            </div>
+            <div className="form-grid">
+              <div className="form-row">
+                <label>Criador</label>
+                <input value={cCreator} onChange={(e) => setCCreator(e.target.value)} disabled={building} />
+              </div>
+              <div className="form-row">
+                <label>Página inicial</label>
+                <input
+                  value={cMain}
+                  onChange={(e) => setCMain(e.target.value)}
+                  disabled={building}
+                  placeholder="auto (index.html)"
+                />
+              </div>
+            </div>
+
+            {building && (
+              <div className="ft-block" style={{ padding: "10px 0 0" }}>
+                <p style={{ margin: "0 0 6px" }}>
+                  Empacotando… {Math.round((cState?.progress ?? 0) * 100)}%
+                </p>
+                <div className="ft-progress">
+                  <div style={{ width: `${(cState?.progress ?? 0) * 100}%` }} />
+                </div>
+              </div>
+            )}
+            {cState?.state === "error" && <div className="error-banner">{cState.error}</div>}
+            {cState?.state === "done" && cState.result && (
+              <div className="ok-banner">
+                Pronto: {cState.result.articles} artigos, {formatBytes(cState.result.size)} — o
+                arquivo já foi aberto na biblioteca.
+              </div>
+            )}
+
+            <div className="modal-actions">
+              {!building && (
+                <button
+                  className="primary"
+                  disabled={!cSource || !cOutput}
+                  onClick={startCreate}
+                >
+                  Criar
+                </button>
+              )}
+              {building && (
+                <button className="ghost" onClick={() => cancelCreateZim()}>
+                  Cancelar
+                </button>
+              )}
+              <button disabled={building} onClick={() => setCreateOpen(false)}>
+                Fechar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

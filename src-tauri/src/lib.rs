@@ -6,6 +6,7 @@
 
 mod search;
 mod zim;
+mod zimwriter;
 
 use base64::engine::general_purpose::STANDARD as B64;
 use base64::Engine as _;
@@ -48,6 +49,8 @@ struct AppState {
     ft_builds: Mutex<HashMap<String, Arc<search::FtBuild>>>,
     /// Índices full-text já abertos, por id de livro.
     ft_indexes: Mutex<HashMap<String, Arc<search::FtIndex>>>,
+    /// Criação de ZIM em andamento (uma por vez); o flag cancela.
+    zim_create: Mutex<Option<Arc<std::sync::atomic::AtomicBool>>>,
 }
 
 fn get_book(state: &AppState, id: &str) -> Result<Arc<ZimFile>, String> {
@@ -290,6 +293,94 @@ fn startup_file() -> Option<String> {
         .find(|a| a.to_lowercase().ends_with(".zim"))
 }
 
+// ---------- criação de ZIM a partir de pasta ----------
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateZimSpec {
+    source: String,
+    output: String,
+    title: String,
+    #[serde(default)]
+    description: String,
+    #[serde(default)]
+    language: String,
+    #[serde(default)]
+    creator: String,
+    #[serde(default)]
+    main_page: Option<String>,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct CreateZimResult {
+    entries: u32,
+    articles: u32,
+    size: u64,
+    output: String,
+}
+
+/// Empacota uma pasta num .zim, em thread própria, com progresso via evento
+/// "zim-create" ({state: building|done|error, progress, ...}).
+#[tauri::command]
+async fn create_zim(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    spec: CreateZimSpec,
+) -> Result<(), String> {
+    let cancel = {
+        let mut slot = state.zim_create.lock().unwrap();
+        if slot.is_some() {
+            return Err("Já existe uma criação de ZIM em andamento".into());
+        }
+        let c = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        *slot = Some(c.clone());
+        c
+    };
+    std::thread::spawn(move || {
+        let ws = zimwriter::CreateSpec {
+            source: PathBuf::from(&spec.source),
+            output: PathBuf::from(&spec.output),
+            title: spec.title.clone(),
+            description: spec.description.clone(),
+            language: if spec.language.trim().is_empty() {
+                "por".into()
+            } else {
+                spec.language.clone()
+            },
+            creator: spec.creator.clone(),
+            main_page: spec.main_page.clone(),
+        };
+        let _ = app.emit("zim-create", json!({ "state": "building", "progress": 0.0 }));
+        let res = zimwriter::create(&ws, &cancel, |p| {
+            let _ = app.emit("zim-create", json!({ "state": "building", "progress": p }));
+        });
+        *app.state::<AppState>().zim_create.lock().unwrap() = None;
+        let payload = match res {
+            Ok(r) => json!({
+                "state": "done",
+                "progress": 1.0,
+                "result": CreateZimResult {
+                    entries: r.entries,
+                    articles: r.articles,
+                    size: r.size,
+                    output: spec.output,
+                },
+            }),
+            Err(e) => json!({ "state": "error", "progress": 0.0, "error": e }),
+        };
+        let _ = app.emit("zim-create", payload);
+    });
+    Ok(())
+}
+
+#[tauri::command]
+fn cancel_create_zim(state: State<'_, AppState>) {
+    if let Some(c) = state.zim_create.lock().unwrap().as_ref() {
+        c.store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
 // ---------- protocolo zim:// ----------
 
 fn encode_entry_path(p: &str) -> String {
@@ -506,7 +597,9 @@ pub fn run() {
             fulltext_status,
             fulltext_build,
             fulltext_cancel,
-            fulltext_search
+            fulltext_search,
+            create_zim,
+            cancel_create_zim
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o LocalZIM");

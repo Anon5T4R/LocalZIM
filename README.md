@@ -34,6 +34,12 @@ Parte da suíte **Local** (Tauri 2 + React 19 + TypeScript + Rust). Licença MIT
   sem compressão são lidos por fatia (vídeo grande não carrega o cluster inteiro na RAM).
 - Links externos abrem no navegador do sistema; associação de arquivo `.zim`; instância única
   (clique duplo num `.zim` reaproveita a janela aberta).
+- **Criar .zim de uma pasta** (`src-tauri/src/zimwriter.rs`): empacota uma pasta com HTML
+  (site salvo com `wget --mirror`, documentação, notas exportadas) num `.zim` válido — título
+  extraído de cada página, metadados, favicon, clusters zstd pra texto e crus pra mídia
+  (streaming: vídeo grande não passa pela RAM), md5 no rodapé. Abre no LocalZIM e no Kiwix.
+  Para rastrear um site da internet o [zimit](https://github.com/openzim/zimit) continua sendo
+  a ferramenta certa; o criador local é o caminho rápido quando você já tem os arquivos.
 
 ## Onde conseguir (e como criar) arquivos .zim
 

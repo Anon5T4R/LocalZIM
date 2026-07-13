@@ -50,6 +50,26 @@ export const zimSuggest = (id: string, query: string, limit = 12) =>
 export const zimRandom = (id: string) => invoke<string | null>("zim_random", { id });
 export const startupFile = () => invoke<string | null>("startup_file");
 
+export interface CreateZimSpec {
+  source: string;
+  output: string;
+  title: string;
+  description?: string;
+  language?: string;
+  creator?: string;
+  mainPage?: string | null;
+}
+
+export interface ZimCreateEvent {
+  state: "building" | "done" | "error";
+  progress: number;
+  result?: { entries: number; articles: number; size: number; output: string };
+  error?: string;
+}
+
+export const createZim = (spec: CreateZimSpec) => invoke<void>("create_zim", { spec });
+export const cancelCreateZim = () => invoke<void>("cancel_create_zim");
+
 export const fulltextStatus = (id: string) => invoke<FtStatus>("fulltext_status", { id });
 export const fulltextBuild = (id: string) => invoke<void>("fulltext_build", { id });
 export const fulltextCancel = (id: string) => invoke<void>("fulltext_cancel", { id });
