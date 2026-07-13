@@ -402,8 +402,14 @@ pub fn crawl(
     cancel: &AtomicBool,
     mut on_progress: impl FnMut(CrawlProgress),
 ) -> Result<CrawlOutcome, String> {
-    let start = Url::parse(spec.start_url.trim())
-        .map_err(|e| format!("URL inválida: {e}"))?;
+    // usuário digita "site.com" sem esquema o tempo todo — completa sozinho
+    let raw = spec.start_url.trim();
+    let raw = if raw.contains("://") {
+        raw.to_string()
+    } else {
+        format!("https://{raw}")
+    };
+    let start = Url::parse(&raw).map_err(|e| format!("URL inválida: {e}"))?;
     if start.scheme() != "http" && start.scheme() != "https" {
         return Err("A URL precisa começar com http:// ou https://".into());
     }
@@ -462,9 +468,20 @@ pub fn crawl(
             std::thread::sleep(delay);
         }
 
+        // A PRIMEIRA página falhando merece o erro real na tela (403 de
+        // anti-bot, DNS errado…); depois que algo já entrou, 404 segue o baile.
         let resp = match client.get(url.clone()).send() {
             Ok(r) if r.status().is_success() => r,
-            _ => continue, // 404/erro de rede: segue o baile
+            Ok(r) if files == 0 => {
+                let hint = if r.status() == 403 || r.status() == 429 {
+                    " — o site provavelmente bloqueia robôs; tente o zimit"
+                } else {
+                    ""
+                };
+                return Err(format!("O site respondeu {} na página inicial{}", r.status(), hint));
+            }
+            Err(e) if files == 0 => return Err(format!("Falha de rede na página inicial: {e}")),
+            _ => continue,
         };
         let mut final_url = resp.url().clone();
         final_url.set_fragment(None);

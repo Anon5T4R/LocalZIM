@@ -339,38 +339,49 @@ async fn create_zim(
         c
     };
     std::thread::spawn(move || {
-        let ws = zimwriter::CreateSpec {
-            source: PathBuf::from(&spec.source),
-            output: PathBuf::from(&spec.output),
-            title: spec.title.clone(),
-            description: spec.description.clone(),
-            language: if spec.language.trim().is_empty() {
-                "por".into()
-            } else {
-                spec.language.clone()
-            },
-            creator: spec.creator.clone(),
-            main_page: spec.main_page.clone(),
-        };
-        let _ = app.emit("zim-create", json!({ "state": "building", "progress": 0.0 }));
-        let res = zimwriter::create(&ws, &cancel, |p| {
-            let _ = app.emit("zim-create", json!({ "state": "building", "progress": p }));
-        });
-        *app.state::<AppState>().zim_create.lock().unwrap() = None;
-        let payload = match res {
-            Ok(r) => json!({
-                "state": "done",
-                "progress": 1.0,
-                "result": CreateZimResult {
-                    entries: r.entries,
-                    articles: r.articles,
-                    size: r.size,
-                    output: spec.output,
+        let app2 = app.clone();
+        // panic aqui dentro não pode deixar o slot preso "em andamento" pra sempre
+        let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
+            let ws = zimwriter::CreateSpec {
+                source: PathBuf::from(&spec.source),
+                output: PathBuf::from(&spec.output),
+                title: spec.title.clone(),
+                description: spec.description.clone(),
+                language: if spec.language.trim().is_empty() {
+                    "por".into()
+                } else {
+                    spec.language.clone()
                 },
-            }),
-            Err(e) => json!({ "state": "error", "progress": 0.0, "error": e }),
-        };
-        let _ = app.emit("zim-create", payload);
+                creator: spec.creator.clone(),
+                main_page: spec.main_page.clone(),
+            };
+            let _ = app.emit("zim-create", json!({ "state": "building", "progress": 0.0 }));
+            let res = zimwriter::create(&ws, &cancel, |p| {
+                let _ = app.emit("zim-create", json!({ "state": "building", "progress": p }));
+            });
+            *app.state::<AppState>().zim_create.lock().unwrap() = None;
+            let payload = match res {
+                Ok(r) => json!({
+                    "state": "done",
+                    "progress": 1.0,
+                    "result": CreateZimResult {
+                        entries: r.entries,
+                        articles: r.articles,
+                        size: r.size,
+                        output: spec.output,
+                    },
+                }),
+                Err(e) => json!({ "state": "error", "progress": 0.0, "error": e }),
+            };
+            let _ = app.emit("zim-create", payload);
+        }));
+        if ran.is_err() {
+            *app2.state::<AppState>().zim_create.lock().unwrap() = None;
+            let _ = app2.emit(
+                "zim-create",
+                json!({ "state": "error", "progress": 0.0, "error": "Erro interno inesperado durante a criação" }),
+            );
+        }
     });
     Ok(())
 }
@@ -421,6 +432,8 @@ async fn create_zim_from_site(
         c
     };
     std::thread::spawn(move || {
+        let app_guard = app.clone();
+        let ran = std::panic::catch_unwind(std::panic::AssertUnwindSafe(move || {
         let done = |app: &tauri::AppHandle| {
             *app.state::<AppState>().zim_create.lock().unwrap() = None;
         };
@@ -502,6 +515,14 @@ async fn create_zim_from_site(
             Err(e) => json!({ "state": "error", "progress": 0.0, "error": e }),
         };
         let _ = app.emit("zim-create", payload);
+        }));
+        if ran.is_err() {
+            *app_guard.state::<AppState>().zim_create.lock().unwrap() = None;
+            let _ = app_guard.emit(
+                "zim-create",
+                json!({ "state": "error", "progress": 0.0, "error": "Erro interno inesperado durante a criação" }),
+            );
+        }
     });
     Ok(())
 }

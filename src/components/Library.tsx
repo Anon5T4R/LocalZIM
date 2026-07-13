@@ -21,11 +21,15 @@ interface Props {
 }
 
 function hostOf(url: string): string {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return "";
+  const u = url.trim();
+  for (const candidate of [u, `https://${u}`]) {
+    try {
+      return new URL(candidate).hostname;
+    } catch {
+      /* tenta a próxima forma */
+    }
   }
+  return "";
 }
 
 function metaLine(language: string, size: number, articles: number | null): string {
@@ -92,6 +96,18 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
   };
 
   const startCreate = async () => {
+    if (!cSource) {
+      setCState({ state: "error", progress: 0, error: "Escolha a pasta de origem." });
+      return;
+    }
+    if (!cOutput) {
+      setCState({
+        state: "error",
+        progress: 0,
+        error: "Escolha onde salvar o arquivo .zim (botão \"Escolher…\" em Salvar como).",
+      });
+      return;
+    }
     setCState({ state: "building", progress: 0 });
     try {
       await createZim({
@@ -128,6 +144,19 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
   };
 
   const startSite = async () => {
+    // validação com feedback — botão desabilitado sem aviso é clique morto
+    if (!sUrl.trim()) {
+      setCState({ state: "error", progress: 0, error: "Informe o endereço do site." });
+      return;
+    }
+    if (!sOutput) {
+      setCState({
+        state: "error",
+        progress: 0,
+        error: "Escolha onde salvar o arquivo .zim (botão \"Escolher…\" em Salvar como).",
+      });
+      return;
+    }
     setCState({ state: "building", progress: 0, phase: "crawl", pages: 0 });
     try {
       await createZimFromSite({
@@ -373,7 +402,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
 
             <div className="modal-actions">
               {!building && (
-                <button className="primary" disabled={!sUrl.trim() || !sOutput} onClick={startSite}>
+                <button className="primary" onClick={startSite}>
                   Baixar e criar
                 </button>
               )}
@@ -478,11 +507,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
 
             <div className="modal-actions">
               {!building && (
-                <button
-                  className="primary"
-                  disabled={!cSource || !cOutput}
-                  onClick={startCreate}
-                >
+                <button className="primary" onClick={startCreate}>
                   Criar
                 </button>
               )}
