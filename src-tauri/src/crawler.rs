@@ -338,7 +338,26 @@ pub fn rewrite_html(
                     el.remove();
                     Ok(())
                 }),
-                element!("a[href], link[href]", |el| {
+                element!("a[href]", |el| {
+                    // link pra página que não entrou no crawl (fora do caminho,
+                    // acima do limite…) vira absoluto — o leitor abre no
+                    // navegador em vez de dar 404 dentro do .zim
+                    let Some(v) = el.get_attribute("href") else { return Ok(()) };
+                    let frag = v.find('#').map(|i| v[i..].to_string());
+                    if let Some(u) = resolve(base, &v) {
+                        let newv = match map.get(u.as_str()) {
+                            Some(local) => href_encode(&rel_path(from_local, local)),
+                            None => u.to_string(),
+                        };
+                        let mut newv = newv;
+                        if let Some(f) = frag {
+                            newv.push_str(&f);
+                        }
+                        let _ = el.set_attribute("href", &newv);
+                    }
+                    Ok(())
+                }),
+                element!("link[href]", |el| {
                     rewrite_attr(el, "href");
                     Ok(())
                 }),
@@ -772,12 +791,19 @@ mod tests {
         map.insert("https://site.com/img/foto%20grande.png".into(), "img/foto grande.png".into());
         let html = r#"<html><head><base href="/x/"><link rel="stylesheet" href="/css/a.css"></head>
             <body><a href="outro.html#sec">i</a> <a href="https://fora.com/p">e</a>
+            <a href="/nao-baixada.html#topo">n</a>
             <img src="/img/foto%20grande.png"></body></html>"#;
         let out = rewrite_html(html, &base, "blog/post.html", &map);
         assert!(out.contains("href=\"outro.html#sec\""), "{out}");
         assert!(out.contains("href=\"../css/a.css\""));
         assert!(out.contains("src=\"../img/foto%20grande.png\""));
         assert!(out.contains("https://fora.com/p")); // externo fica absoluto
+        // página do mesmo host que não foi baixada vira link absoluto (abre no
+        // navegador), preservando o fragmento — nada de 404 dentro do .zim
+        assert!(
+            out.contains("href=\"https://site.com/nao-baixada.html#topo\""),
+            "{out}"
+        );
         assert!(!out.contains("<base"), "base tem que sumir");
     }
 
@@ -902,6 +928,12 @@ mod tests {
         assert!(staging.join("docs/toc.js").exists(), "toc.js baixado como asset");
         // fora do /docs/ não entra, mesmo sendo o mesmo host
         assert!(!staging.join("fora").exists(), "vazou do caminho inicial");
+        // …e o link pra ela vira absoluto (o leitor manda pro navegador)
+        let index = fs::read_to_string(staging.join("docs/index.html")).unwrap();
+        assert!(
+            index.contains(&format!("href=\"http://127.0.0.1:{port}/fora/leak.html\"")),
+            "{index}"
+        );
 
         let _ = fs::remove_dir_all(&staging);
     }
