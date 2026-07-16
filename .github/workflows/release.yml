@@ -59,7 +59,11 @@ jobs:
 
       - name: Testes do parser ZIM
         working-directory: src-tauri
-        run: cargo test --lib
+        run: cargo test --locked --lib
+
+      - name: Cargo.lock em dia (--locked)
+        working-directory: src-tauri
+        run: cargo fetch --locked
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0

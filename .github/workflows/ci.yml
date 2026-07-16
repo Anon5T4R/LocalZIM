@@ -41,4 +41,4 @@ jobs:
 
       - name: Testes do Rust (parser ZIM, writer, crawler, busca)
         working-directory: src-tauri
-        run: cargo test --lib
+        run: cargo test --locked --lib
