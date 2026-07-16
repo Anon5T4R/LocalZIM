@@ -24,8 +24,10 @@ import {
   zimRandom,
   zimSuggest,
 } from "../lib/backend";
-import { LANG_NAMES, LEG_NAMES, guessLang } from "../lib/lang";
+import { LANG_NAMES, legName, guessLang } from "../lib/lang";
 import { pathFromHref, zimUrl } from "../lib/paths";
+import { t } from "../lib/i18n";
+import LocalePicker from "./LocalePicker";
 
 export interface NavTarget {
   id: string;
@@ -191,7 +193,7 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
       setTimeout(() => {
         if (trBlocksResolve.current === resolve) {
           trBlocksResolve.current = null;
-          reject(new Error("a página não respondeu"));
+          reject(new Error(t("tr.pageNoResponse")));
         }
       }, 4000);
     });
@@ -499,23 +501,23 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
   return (
     <div className="reader">
       <div className="toolbar">
-        <button className="tb" onClick={onLibrary} title="Biblioteca">
+        <button className="tb" onClick={onLibrary} title={t("rd.library")}>
           ☰
         </button>
-        <button className="tb" onClick={() => history.back()} title="Voltar (Alt+←)">
+        <button className="tb" onClick={() => history.back()} title={t("rd.back")}>
           ←
         </button>
-        <button className="tb" onClick={() => history.forward()} title="Avançar (Alt+→)">
+        <button className="tb" onClick={() => history.forward()} title={t("rd.forward")}>
           →
         </button>
         <button
           className="tb"
           onClick={() => active.mainPath && navigate(active.mainPath)}
-          title="Página principal"
+          title={t("rd.home")}
         >
           ⌂
         </button>
-        <button className="tb" onClick={goRandom} title="Artigo aleatório">
+        <button className="tb" onClick={goRandom} title={t("rd.random")}>
           🎲
         </button>
 
@@ -527,7 +529,7 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
             onKeyDown={onSearchKey}
             onFocus={() => query.trim() && setShowSugs(true)}
             onBlur={() => setTimeout(() => setShowSugs(false), 150)}
-            placeholder={`Buscar em ${active.name}… (Ctrl+K)`}
+            placeholder={t("rd.searchPlaceholder", { name: active.name })}
             spellCheck={false}
           />
           {showSugs && query.trim() && (
@@ -551,18 +553,18 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
                   openFulltext(query);
                 }}
               >
-                🔎 Buscar “{query.trim()}” no texto completo
+                🔎 {t("rd.searchFt", { q: query.trim() })}
               </li>
             </ul>
           )}
         </div>
 
         <div className="zoom">
-          <button className="tb" onClick={() => applyZoom(zoom - 10)} title="Diminuir zoom (Ctrl+-)">
+          <button className="tb" onClick={() => applyZoom(zoom - 10)} title={t("rd.zoomOut")}>
             −
           </button>
           <span className="zoom-label">{zoom}%</span>
-          <button className="tb" onClick={() => applyZoom(zoom + 10)} title="Aumentar zoom (Ctrl+=)">
+          <button className="tb" onClick={() => applyZoom(zoom + 10)} title={t("rd.zoomIn")}>
             +
           </button>
         </div>
@@ -570,20 +572,21 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
         <button
           className="tb"
           onClick={() => keyActionRef.current("find")}
-          title="Localizar na página (Ctrl+F)"
+          title={t("rd.findTitle")}
         >
           🔍
         </button>
         <button
           className={trOpen || trPhase === "done" ? "tb tb-on" : "tb"}
           onClick={() => setTrOpen((o) => !o)}
-          title="Traduzir página (offline)"
+          title={t("rd.translateTitle")}
         >
           🌐
         </button>
-        <button className="tb" onClick={onToggleDark} title="Alternar tema claro/escuro">
+        <button className="tb" onClick={onToggleDark} title={t("rd.themeTitle")}>
           {dark ? "☀️" : "🌙"}
         </button>
+        <LocalePicker className="tb-lang" />
 
         <div className="crumb" title={title}>
           <span className="crumb-book">{active.name}</span>
@@ -592,7 +595,7 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
       </div>
 
       <div className="reader-body">
-        <iframe ref={iframeRef} className="content" title="Conteúdo do arquivo ZIM" />
+        <iframe ref={iframeRef} className="content" title={t("rd.iframeTitle")} />
 
         {findOpen && (
           <div className="findbar">
@@ -604,16 +607,16 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
                 if (e.key === "Enter") doFind(e.shiftKey);
                 else if (e.key === "Escape") setFindOpen(false);
               }}
-              placeholder="Localizar na página…"
+              placeholder={t("find.placeholder")}
               spellCheck={false}
             />
-            <button className="tb" onClick={() => doFind(true)} title="Anterior (Shift+Enter)">
+            <button className="tb" onClick={() => doFind(true)} title={t("find.prev")}>
               ↑
             </button>
-            <button className="tb" onClick={() => doFind(false)} title="Próximo (Enter)">
+            <button className="tb" onClick={() => doFind(false)} title={t("find.next")}>
               ↓
             </button>
-            <button className="tb" onClick={() => setFindOpen(false)} title="Fechar (Esc)">
+            <button className="tb" onClick={() => setFindOpen(false)} title={t("find.close")}>
               ✕
             </button>
           </div>
@@ -622,10 +625,10 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
         {extUrl && (
           <div className="modal-overlay" onClick={() => setExtUrl(null)}>
             <div className="modal ext-modal" onClick={(e) => e.stopPropagation()}>
-              <h3>Sair do arquivo</h3>
+              <h3>{t("ext.title")}</h3>
               <p className="modal-hint">
-                Este link não faz parte do arquivo <strong>{active.name}</strong> — ele aponta
-                para <strong>{urlHost(extUrl)}</strong>, na internet. Quer abrir no seu navegador?
+                {t("ext.hintPre")} <strong>{active.name}</strong> {t("ext.hintMid")}{" "}
+                <strong>{urlHost(extUrl)}</strong>{t("ext.hintPost")}
               </p>
               <div className="ext-url" title={extUrl}>
                 {extUrl}
@@ -637,7 +640,7 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
                     skipExtWarn.current = e.target.checked;
                   }}
                 />
-                Não avisar de novo enquanto o LocalZIM estiver aberto
+                {t("ext.dontWarn")}
               </label>
               <div className="modal-actions">
                 <button
@@ -647,10 +650,10 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
                     setExtUrl(null);
                   }}
                 >
-                  Abrir no navegador
+                  {t("ext.openBrowser")}
                 </button>
                 <button className="ghost" onClick={() => setExtUrl(null)}>
-                  Cancelar
+                  {t("common.cancel")}
                 </button>
               </div>
             </div>
@@ -660,14 +663,14 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
         {trOpen && (
           <div className="ftpanel trpanel">
             <div className="ft-head">
-              <div className="ft-title">Tradução offline</div>
-              <button className="tb" onClick={() => setTrOpen(false)} title="Fechar">
+              <div className="ft-title">{t("tr.title")}</div>
+              <button className="tb" onClick={() => setTrOpen(false)} title={t("common.close")}>
                 ✕
               </button>
             </div>
 
             <div className="tr-langs">
-              <span className="tr-label">Traduzir para</span>
+              <span className="tr-label">{t("tr.translateTo")}</span>
               <div className="tr-seg">
                 {(Object.keys(LANG_NAMES) as Lang[]).map((l) => (
                   <button
@@ -682,7 +685,7 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
             </div>
 
             <div className="tr-langs">
-              <span className="tr-label">Idioma do artigo</span>
+              <span className="tr-label">{t("tr.articleLang")}</span>
               <select
                 className="tr-src"
                 value={trSrcOverride}
@@ -690,8 +693,8 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
               >
                 <option value="auto">
                   {trSrcOverride === "auto" && trSrc
-                    ? `Detectado: ${LANG_NAMES[trSrc]}`
-                    : "Detectar automaticamente"}
+                    ? t("tr.detected", { name: LANG_NAMES[trSrc] })
+                    : t("tr.autoDetect")}
                 </option>
                 {(Object.keys(LANG_NAMES) as Lang[]).map((l) => (
                   <option key={l} value={l}>
@@ -701,31 +704,24 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
               </select>
             </div>
 
-            {!trSrc && (
-              <div className="ft-block">
-                Não deu pra detectar o idioma deste artigo — escolha acima. A tradução
-                funciona entre português, espanhol e inglês.
-              </div>
-            )}
+            {!trSrc && <div className="ft-block">{t("tr.noDetect")}</div>}
             {trSrc && trSrc === trTgt && (
-              <div className="ft-block">O artigo já está em {LANG_NAMES[trTgt]}.</div>
+              <div className="ft-block">{t("tr.already", { name: LANG_NAMES[trTgt] })}</div>
             )}
 
             {trDirection && trStatus && !trStatus.legs.every((l) => l.installed) && (
               <div className="ft-block">
                 <p>
-                  Primeira vez nesta direção: o LocalZIM baixa o modelo de tradução{" "}
-                  <strong>uma única vez</strong> e depois funciona 100% offline.
-                  {trStatus.legs.length > 1 && (
-                    <> Português ↔ espanhol passa pelo inglês, então são dois modelos.</>
-                  )}
+                  {t("tr.firstTimePre")} <strong>{t("tr.firstTimeStrong")}</strong>{" "}
+                  {t("tr.firstTimePost")}
+                  {trStatus.legs.length > 1 && <>{t("tr.viaEnglish")}</>}
                 </p>
                 {trStatus.legs.filter((l) => !l.installed).map((l) => {
                   const dl = trDl[l.leg];
                   return (
                     <div key={l.leg} className="tr-leg">
                       <span className="tr-leg-name">
-                        {LEG_NAMES[l.leg] ?? l.leg} · {fmtMB(l.bytes)}
+                        {legName(l.leg)} · {fmtMB(l.bytes)}
                       </span>
                       {dl ? (
                         <>
@@ -740,21 +736,27 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
                             className="ghost"
                             onClick={() => translateCancelDownload(l.leg)}
                           >
-                            Cancelar
+                            {t("common.cancel")}
                           </button>
                         </>
                       ) : l.downloading ? (
-                        <span className="tr-muted">preparando…</span>
+                        <span className="tr-muted">{t("tr.preparing")}</span>
                       ) : null}
                     </div>
                   );
                 })}
                 {!trStatus.legs.some((l) => l.downloading || trDl[l.leg]) && (
                   <button className="primary" onClick={downloadMissing}>
-                    Baixar {trStatus.legs.filter((l) => !l.installed).length > 1 ? "modelos" : "modelo"}{" "}
-                    ({fmtMB(
-                      trStatus.legs.filter((l) => !l.installed).reduce((s, l) => s + l.bytes, 0)
-                    )})
+                    {t(
+                      trStatus.legs.filter((l) => !l.installed).length > 1
+                        ? "tr.downloadModels"
+                        : "tr.downloadModel",
+                      {
+                        size: fmtMB(
+                          trStatus.legs.filter((l) => !l.installed).reduce((s, l) => s + l.bytes, 0),
+                        ),
+                      },
+                    )}
                   </button>
                 )}
               </div>
@@ -764,15 +766,13 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
               <div className="ft-block">
                 {trPhase === "idle" && (
                   <button className="primary" onClick={() => startTranslateRef.current()}>
-                    Traduzir página
+                    {t("tr.translatePage")}
                   </button>
                 )}
-                {trPhase === "loading" && <p>Carregando modelo…</p>}
+                {trPhase === "loading" && <p>{t("tr.loadingModel")}</p>}
                 {trPhase === "translating" && (
                   <>
-                    <p>
-                      Traduzindo… {trProgress.done}/{trProgress.total} blocos
-                    </p>
+                    <p>{t("tr.translating", { done: trProgress.done, total: trProgress.total })}</p>
                     <div className="ft-progress">
                       <div
                         style={{
@@ -781,15 +781,15 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
                       />
                     </div>
                     <button className="ghost" onClick={cancelTranslate}>
-                      Parar
+                      {t("tr.stop")}
                     </button>
                   </>
                 )}
                 {trPhase === "done" && (
                   <>
-                    <p>✓ Página traduzida (fica em cache — voltar aqui é instantâneo).</p>
+                    <p>{t("tr.doneCached")}</p>
                     <button className="ghost" onClick={toggleOriginal}>
-                      {trShowOrig ? "Ver tradução" : "Ver original"}
+                      {trShowOrig ? t("tr.showTranslation") : t("tr.showOriginal")}
                     </button>
                   </>
                 )}
@@ -799,17 +799,17 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
                     checked={trAuto}
                     onChange={(e) => setTrAuto(e.target.checked)}
                   />
-                  Traduzir as próximas páginas automaticamente
+                  {t("tr.autoNext")}
                 </label>
                 <div className="tr-manage">
                   {trStatus.legs.map((l) => (
                     <button
                       key={l.leg}
                       className="tr-remove"
-                      title={`Apagar o modelo ${LEG_NAMES[l.leg] ?? l.leg} do disco (${fmtMB(l.bytes)})`}
+                      title={t("tr.removeModelTitle", { name: legName(l.leg), size: fmtMB(l.bytes) })}
                       onClick={() => removeLeg(l.leg)}
                     >
-                      🗑 {LEG_NAMES[l.leg] ?? l.leg}
+                      🗑 {legName(l.leg)}
                     </button>
                   ))}
                 </div>
@@ -823,8 +823,8 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
         {ftOpen && (
           <div className="ftpanel">
             <div className="ft-head">
-              <div className="ft-title">Texto completo</div>
-              <button className="tb" onClick={() => setFtOpen(false)} title="Fechar">
+              <div className="ft-title">{t("ft.title")}</div>
+              <button className="tb" onClick={() => setFtOpen(false)} title={t("common.close")}>
                 ✕
               </button>
             </div>
@@ -833,37 +833,36 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
             {ftStatus?.state === "none" && (
               <div className="ft-block">
                 <p>
-                  Este arquivo ainda não tem índice de busca. O LocalZIM cria um índice local{" "}
-                  <strong>uma única vez</strong> — pode demorar e ocupar espaço em disco,
-                  proporcional ao tamanho do arquivo.
+                  {t("ft.noIndexPre")} <strong>{t("ft.noIndexStrong")}</strong>{" "}
+                  {t("ft.noIndexPost")}
                 </p>
                 <button className="primary" onClick={() => fulltextBuild(active.id)}>
-                  Criar índice agora
+                  {t("ft.buildNow")}
                 </button>
               </div>
             )}
 
             {ftStatus?.state === "building" && (
               <div className="ft-block">
-                <p>Indexando artigos… {Math.round((ftStatus.progress ?? 0) * 100)}%</p>
+                <p>{t("ft.indexing", { pct: Math.round((ftStatus.progress ?? 0) * 100) })}</p>
                 <div className="ft-progress">
                   <div style={{ width: `${(ftStatus.progress ?? 0) * 100}%` }} />
                 </div>
                 <button className="ghost" onClick={() => fulltextCancel(active.id)}>
-                  Cancelar
+                  {t("common.cancel")}
                 </button>
               </div>
             )}
 
             {ftStatus?.state === "error" && (
-              <div className="ft-block">Falha na indexação — tente de novo.</div>
+              <div className="ft-block">{t("ft.indexFail")}</div>
             )}
 
             {ftStatus?.state === "ready" && (
               <div className="ft-results">
-                {ftBusy && <div className="ft-block">Buscando…</div>}
+                {ftBusy && <div className="ft-block">{t("ft.searching")}</div>}
                 {!ftBusy && ftResults?.length === 0 && (
-                  <div className="ft-block">Nada encontrado.</div>
+                  <div className="ft-block">{t("ft.nothing")}</div>
                 )}
                 {!ftBusy &&
                   ftResults?.map((r) => (

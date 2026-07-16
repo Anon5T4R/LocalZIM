@@ -7,13 +7,14 @@ export const LANG_NAMES: Record<Lang, string> = {
   en: "English",
 };
 
-/** Modelos (pernas) de tradução, na nomenclatura das releases. */
-export const LEG_NAMES: Record<string, string> = {
-  "en-pt": "inglês → português",
-  "pt-en": "português → inglês",
-  "en-es": "inglês → espanhol",
-  "es-en": "espanhol → inglês",
-};
+/**
+ * Nome de um modelo (perna) de tradução, ex.: "en-pt" → "English → Português".
+ * Montado a partir dos endônimos (LANG_NAMES), então é neutro de idioma da UI.
+ */
+export function legName(leg: string): string {
+  const [a, b] = leg.split("-") as Lang[];
+  return LANG_NAMES[a] && LANG_NAMES[b] ? `${LANG_NAMES[a]} → ${LANG_NAMES[b]}` : leg;
+}
 
 /**
  * Detecta um idioma suportado a partir do metadado do livro ou do atributo

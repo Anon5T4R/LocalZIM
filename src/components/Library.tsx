@@ -11,6 +11,8 @@ import {
 } from "../lib/backend";
 import { formatBytes } from "../lib/paths";
 import { loadRecents, removeRecent, RecentBook } from "../lib/recents";
+import { t, localeTag } from "../lib/i18n";
+import LocalePicker from "./LocalePicker";
 
 interface Props {
   books: ZimInfo[];
@@ -36,7 +38,7 @@ function metaLine(language: string, size: number, articles: number | null): stri
   const parts: string[] = [];
   if (language) parts.push(language);
   if (size > 0) parts.push(formatBytes(size));
-  if (articles != null) parts.push(`${articles.toLocaleString("pt-BR")} artigos`);
+  if (articles != null) parts.push(t("lib.articles", { n: articles.toLocaleString(localeTag()) }));
   return parts.join(" · ");
 }
 
@@ -68,15 +70,15 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
 
   const pickFile = async () => {
     const sel = await openDialog({
-      title: "Abrir arquivo ZIM",
+      title: t("dlg.openZim"),
       multiple: false,
-      filters: [{ name: "Arquivos ZIM", extensions: ["zim"] }],
+      filters: [{ name: t("dlg.zimFiles"), extensions: ["zim"] }],
     });
     if (typeof sel === "string") onOpenPath(sel);
   };
 
   const pickSourceDir = async () => {
-    const sel = await openDialog({ title: "Pasta com o conteúdo (HTML)", directory: true });
+    const sel = await openDialog({ title: t("dlg.sourceDir"), directory: true });
     if (typeof sel === "string") {
       setCSource(sel);
       if (!cTitle) {
@@ -88,23 +90,23 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
 
   const pickOutput = async () => {
     const sel = await saveDialog({
-      title: "Salvar arquivo ZIM",
+      title: t("dlg.saveZim"),
       defaultPath: `${(cTitle || "biblioteca").replace(/[\\/:*?"<>|]/g, "-")}.zim`,
-      filters: [{ name: "Arquivo ZIM", extensions: ["zim"] }],
+      filters: [{ name: t("dlg.zimFile"), extensions: ["zim"] }],
     });
     if (typeof sel === "string") setCOutput(sel);
   };
 
   const startCreate = async () => {
     if (!cSource) {
-      setCState({ state: "error", progress: 0, error: "Escolha a pasta de origem." });
+      setCState({ state: "error", progress: 0, error: t("err.noSource") });
       return;
     }
     if (!cOutput) {
       setCState({
         state: "error",
         progress: 0,
-        error: "Escolha onde salvar o arquivo .zim (botão \"Escolher…\" em Salvar como).",
+        error: t("err.noOutput"),
       });
       return;
     }
@@ -113,7 +115,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
       await createZim({
         source: cSource,
         output: cOutput,
-        title: cTitle.trim() || "Biblioteca",
+        title: cTitle.trim() || t("lib.defaultLibrary"),
         description: cDesc,
         language: cLang,
         creator: cCreator,
@@ -137,9 +139,9 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
 
   const pickSiteOutput = async () => {
     const sel = await saveDialog({
-      title: "Salvar arquivo ZIM",
+      title: t("dlg.saveZim"),
       defaultPath: `${(sTitle || "site").replace(/[\\/:*?"<>|]/g, "-")}.zim`,
-      filters: [{ name: "Arquivo ZIM", extensions: ["zim"] }],
+      filters: [{ name: t("dlg.zimFile"), extensions: ["zim"] }],
     });
     if (typeof sel === "string") setSOutput(sel);
   };
@@ -147,14 +149,14 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
   const startSite = async () => {
     // validação com feedback — botão desabilitado sem aviso é clique morto
     if (!sUrl.trim()) {
-      setCState({ state: "error", progress: 0, error: "Informe o endereço do site." });
+      setCState({ state: "error", progress: 0, error: t("err.noUrl") });
       return;
     }
     if (!sOutput) {
       setCState({
         state: "error",
         progress: 0,
-        error: "Escolha onde salvar o arquivo .zim (botão \"Escolher…\" em Salvar como).",
+        error: t("err.noOutput"),
       });
       return;
     }
@@ -163,7 +165,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
       await createZimFromSite({
         url: sUrl.trim(),
         output: sOutput,
-        title: sTitle.trim() || hostOf(sUrl) || "Site",
+        title: sTitle.trim() || hostOf(sUrl) || t("lib.defaultSite"),
         description: sDesc,
         language: sLang,
         maxDepth: Math.max(0, parseInt(sDepth, 10) || 100),
@@ -185,13 +187,11 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
       <header className="lib-header">
         <div>
           <h1>LocalZIM</h1>
-          <p className="lib-sub">
-            Sua biblioteca offline — leitor de arquivos ZIM (Wikipédia, Stack Overflow, Gutenberg…)
-          </p>
+          <p className="lib-sub">{t("lib.sub")}</p>
         </div>
         <div className="lib-actions">
           <button className="primary" onClick={pickFile}>
-            Abrir arquivo .zim…
+            {t("lib.openBtn")}
           </button>
           <button
             className="secondary"
@@ -199,9 +199,9 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
               setCState(null);
               setCreateOpen(true);
             }}
-            title="Empacota uma pasta com HTML num arquivo .zim"
+            title={t("lib.createFolderTitle")}
           >
-            Criar .zim de uma pasta…
+            {t("lib.createFolder")}
           </button>
           <button
             className="secondary"
@@ -209,10 +209,11 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
               setCState(null);
               setSiteOpen(true);
             }}
-            title="Baixa um site (crawler local) e empacota num .zim"
+            title={t("lib.createSiteTitle")}
           >
-            Criar .zim de um site…
+            {t("lib.createSite")}
           </button>
+          <LocalePicker />
         </div>
       </header>
 
@@ -220,7 +221,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
 
       {books.length > 0 && (
         <section>
-          <h2>Abertos</h2>
+          <h2>{t("lib.open")}</h2>
           <div className="grid">
             {books.map((b) => (
               <div className="card" key={b.id} onClick={() => onActivate(b.id)}>
@@ -238,7 +239,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
                 </div>
                 <button
                   className="card-x"
-                  title="Fechar este arquivo"
+                  title={t("lib.closeFile")}
                   onClick={(e) => {
                     e.stopPropagation();
                     onCloseBook(b.id);
@@ -254,7 +255,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
 
       {closedRecents.length > 0 && (
         <section>
-          <h2>Recentes</h2>
+          <h2>{t("lib.recent")}</h2>
           <div className="grid">
             {closedRecents.map((r) => (
               <div className="card" key={r.path} onClick={() => onOpenPath(r.path)}>
@@ -273,7 +274,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
                 </div>
                 <button
                   className="card-x"
-                  title="Remover dos recentes"
+                  title={t("lib.removeRecent")}
                   onClick={(e) => {
                     e.stopPropagation();
                     setRecents(removeRecent(r.path));
@@ -291,8 +292,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
         <div className="empty">
           <div className="empty-icon">📚</div>
           <p>
-            Nenhum arquivo aberto ainda. Abra um <strong>.zim</strong> do seu computador — dá para
-            baixar a Wikipédia inteira, Wikcionário, Stack Overflow e muito mais em{" "}
+            {t("lib.emptyPre")} <strong>.zim</strong> {t("lib.emptyMid")}{" "}
             <a
               href="https://library.kiwix.org"
               onClick={(e) => {
@@ -305,7 +305,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
             .
           </p>
           <button className="primary" onClick={pickFile}>
-            Abrir arquivo .zim…
+            {t("lib.openBtn")}
           </button>
         </div>
       )}
@@ -313,13 +313,9 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
       {siteOpen && (
         <div className="modal-overlay" onClick={() => !building && setSiteOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Criar .zim de um site</h3>
+            <h3>{t("site.title")}</h3>
             <p className="modal-hint">
-              Crawler local: baixa as páginas a partir da URL inicial (respeitando o robots.txt)
-              com imagens, CSS e scripts, reescreve os links e empacota. Acha capítulos listados
-              em JS de navegação (docs mdBook, ex.: o livro do Rust). Funciona bem pra
-              documentação, blogs e wikis; sites montados por JavaScript (SPA) podem sair
-              incompletos — pra esses, use o{" "}
+              {t("site.hintPre")}{" "}
               <a
                 href="https://github.com/openzim/zimit"
                 onClick={(e) => {
@@ -333,7 +329,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
             </p>
 
             <div className="form-row">
-              <label>Endereço do site</label>
+              <label>{t("site.url")}</label>
               <input
                 value={sUrl}
                 onChange={(e) => {
@@ -341,31 +337,31 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
                   if (!sTitle) setSTitle(hostOf(e.target.value));
                 }}
                 disabled={building}
-                placeholder="https://docs.exemplo.com"
+                placeholder={t("site.urlPlaceholder")}
                 spellCheck={false}
               />
             </div>
             <div className="form-row">
-              <label>Salvar como</label>
+              <label>{t("form.saveAs")}</label>
               <div className="form-pick">
-                <input value={sOutput} readOnly placeholder="destino do arquivo .zim" />
+                <input value={sOutput} readOnly placeholder={t("form.outputPlaceholder")} />
                 <button onClick={pickSiteOutput} disabled={building}>
-                  Escolher…
+                  {t("form.choose")}
                 </button>
               </div>
             </div>
             <div className="form-grid">
               <div className="form-row">
-                <label>Título</label>
+                <label>{t("form.title")}</label>
                 <input value={sTitle} onChange={(e) => setSTitle(e.target.value)} disabled={building} />
               </div>
               <div className="form-row">
-                <label>Idioma</label>
+                <label>{t("form.language")}</label>
                 <input value={sLang} onChange={(e) => setSLang(e.target.value)} disabled={building} />
               </div>
             </div>
             <div className="form-row">
-              <label>Descrição</label>
+              <label>{t("form.description")}</label>
               <input value={sDesc} onChange={(e) => setSDesc(e.target.value)} disabled={building} />
             </div>
             <label className="form-check">
@@ -375,16 +371,16 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
                 onChange={(e) => setSSamePath(e.target.checked)}
                 disabled={building}
               />
-              Baixar só o que está dentro do caminho inicial (ex.: começou em{" "}
-              <code>/book/</code>, não sai dele) — recomendado
+              {t("site.samePathPre")} <code>/book/</code>
+              {t("site.samePathPost")}
             </label>
             <div className="form-grid">
               <div className="form-row">
-                <label>Profundidade de links</label>
+                <label>{t("site.depth")}</label>
                 <input value={sDepth} onChange={(e) => setSDepth(e.target.value)} disabled={building} />
               </div>
               <div className="form-row">
-                <label>Máximo de páginas</label>
+                <label>{t("site.maxPages")}</label>
                 <input
                   value={sMaxPages}
                   onChange={(e) => setSMaxPages(e.target.value)}
@@ -397,8 +393,8 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
               <div className="ft-block" style={{ padding: "10px 0 0" }}>
                 <p style={{ margin: "0 0 6px" }}>
                   {cState?.phase === "crawl"
-                    ? `Baixando páginas… ${cState?.pages ?? 0} (fila: ${cState?.queued ?? 0})`
-                    : `Empacotando… ${Math.round((cState?.progress ?? 0) * 100)}%`}
+                    ? t("site.crawling", { pages: cState?.pages ?? 0, queued: cState?.queued ?? 0 })
+                    : t("folder.packing", { pct: Math.round((cState?.progress ?? 0) * 100) })}
                 </p>
                 <div className="ft-progress">
                   <div style={{ width: `${(cState?.progress ?? 0) * 100}%` }} />
@@ -408,24 +404,26 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
             {cState?.state === "error" && <div className="error-banner">{cState.error}</div>}
             {cState?.state === "done" && cState.result && (
               <div className="ok-banner">
-                Pronto: {cState.result.articles} páginas, {formatBytes(cState.result.size)} — o
-                arquivo já foi aberto na biblioteca.
+                {t("site.doneBanner", {
+                  articles: cState.result.articles,
+                  size: formatBytes(cState.result.size),
+                })}
               </div>
             )}
 
             <div className="modal-actions">
               {!building && (
                 <button className="primary" onClick={startSite}>
-                  Baixar e criar
+                  {t("site.download")}
                 </button>
               )}
               {building && (
                 <button className="ghost" onClick={() => cancelCreateZim()}>
-                  Cancelar
+                  {t("common.cancel")}
                 </button>
               )}
               <button disabled={building} onClick={() => setSiteOpen(false)}>
-                Fechar
+                {t("common.close")}
               </button>
             </div>
           </div>
@@ -435,11 +433,9 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
       {createOpen && (
         <div className="modal-overlay" onClick={() => !building && setCreateOpen(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Criar .zim de uma pasta</h3>
+            <h3>{t("folder.title")}</h3>
             <p className="modal-hint">
-              Empacota uma pasta com HTML (site salvo, documentação, notas exportadas) num
-              arquivo <code>.zim</code>. Links relativos entre as páginas continuam funcionando.
-              Para capturar um site da internet, use o{" "}
+              {t("folder.hintPre")} <code>.zim</code>. {t("folder.hintMid")}{" "}
               <a
                 href="https://github.com/openzim/zimit"
                 onClick={(e) => {
@@ -449,53 +445,53 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
               >
                 zimit
               </a>{" "}
-              (ou <code>wget --mirror</code> e empacote aqui).
+              {t("folder.hintPost")} <code>wget --mirror</code> {t("folder.hintEnd")}
             </p>
 
             <div className="form-row">
-              <label>Pasta de origem</label>
+              <label>{t("folder.source")}</label>
               <div className="form-pick">
-                <input value={cSource} readOnly placeholder="escolha a pasta com o conteúdo" />
+                <input value={cSource} readOnly placeholder={t("folder.sourcePlaceholder")} />
                 <button onClick={pickSourceDir} disabled={building}>
-                  Escolher…
+                  {t("form.choose")}
                 </button>
               </div>
             </div>
             <div className="form-row">
-              <label>Salvar como</label>
+              <label>{t("form.saveAs")}</label>
               <div className="form-pick">
-                <input value={cOutput} readOnly placeholder="destino do arquivo .zim" />
+                <input value={cOutput} readOnly placeholder={t("form.outputPlaceholder")} />
                 <button onClick={pickOutput} disabled={building}>
-                  Escolher…
+                  {t("form.choose")}
                 </button>
               </div>
             </div>
             <div className="form-grid">
               <div className="form-row">
-                <label>Título</label>
+                <label>{t("form.title")}</label>
                 <input value={cTitle} onChange={(e) => setCTitle(e.target.value)} disabled={building} />
               </div>
               <div className="form-row">
-                <label>Idioma</label>
+                <label>{t("form.language")}</label>
                 <input value={cLang} onChange={(e) => setCLang(e.target.value)} disabled={building} placeholder="por" />
               </div>
             </div>
             <div className="form-row">
-              <label>Descrição</label>
+              <label>{t("form.description")}</label>
               <input value={cDesc} onChange={(e) => setCDesc(e.target.value)} disabled={building} />
             </div>
             <div className="form-grid">
               <div className="form-row">
-                <label>Criador</label>
+                <label>{t("folder.creator")}</label>
                 <input value={cCreator} onChange={(e) => setCCreator(e.target.value)} disabled={building} />
               </div>
               <div className="form-row">
-                <label>Página inicial</label>
+                <label>{t("folder.mainPage")}</label>
                 <input
                   value={cMain}
                   onChange={(e) => setCMain(e.target.value)}
                   disabled={building}
-                  placeholder="auto (index.html)"
+                  placeholder={t("folder.mainPlaceholder")}
                 />
               </div>
             </div>
@@ -503,7 +499,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
             {building && (
               <div className="ft-block" style={{ padding: "10px 0 0" }}>
                 <p style={{ margin: "0 0 6px" }}>
-                  Empacotando… {Math.round((cState?.progress ?? 0) * 100)}%
+                  {t("folder.packing", { pct: Math.round((cState?.progress ?? 0) * 100) })}
                 </p>
                 <div className="ft-progress">
                   <div style={{ width: `${(cState?.progress ?? 0) * 100}%` }} />
@@ -513,24 +509,26 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
             {cState?.state === "error" && <div className="error-banner">{cState.error}</div>}
             {cState?.state === "done" && cState.result && (
               <div className="ok-banner">
-                Pronto: {cState.result.articles} artigos, {formatBytes(cState.result.size)} — o
-                arquivo já foi aberto na biblioteca.
+                {t("folder.doneBanner", {
+                  articles: cState.result.articles,
+                  size: formatBytes(cState.result.size),
+                })}
               </div>
             )}
 
             <div className="modal-actions">
               {!building && (
                 <button className="primary" onClick={startCreate}>
-                  Criar
+                  {t("folder.create")}
                 </button>
               )}
               {building && (
                 <button className="ghost" onClick={() => cancelCreateZim()}>
-                  Cancelar
+                  {t("common.cancel")}
                 </button>
               )}
               <button disabled={building} onClick={() => setCreateOpen(false)}>
-                Fechar
+                {t("common.close")}
               </button>
             </div>
           </div>

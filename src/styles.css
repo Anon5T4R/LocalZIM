@@ -288,6 +288,19 @@ button:disabled {
   border-color: var(--border);
 }
 
+.lang-select {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 5px 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.lang-select.tb-lang {
+  height: 34px;
+}
+
 .search {
   position: relative;
   flex: 0 1 420px;
