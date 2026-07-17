@@ -4,12 +4,13 @@ import { closeZim, openZim, startupFile, ZimInfo } from "./lib/backend";
 import { saveRecent } from "./lib/recents";
 import Library from "./components/Library";
 import Reader, { NavTarget } from "./components/Reader";
+import { applyTheme, isDarkTheme, loadTheme, type Theme } from "./lib/theme";
 
 export default function App() {
   const [books, setBooks] = useState<ZimInfo[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [screen, setScreen] = useState<"library" | "reader">("library");
-  const [dark, setDark] = useState(() => localStorage.getItem("localzim.theme") === "dark");
+  const [theme, setTheme] = useState<Theme>(loadTheme);
   const [error, setError] = useState<string | null>(null);
   const [nav, setNav] = useState<NavTarget | null>(null);
   // última página visitada de cada livro, para retomar ao alternar
@@ -17,9 +18,8 @@ export default function App() {
   const navSeq = useRef(0);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = dark ? "dark" : "light";
-    localStorage.setItem("localzim.theme", dark ? "dark" : "light");
-  }, [dark]);
+    applyTheme(theme);
+  }, [theme]);
 
   const goTo = useCallback((id: string, path: string) => {
     navSeq.current += 1;
@@ -110,8 +110,9 @@ export default function App() {
           <Reader
             active={active}
             nav={nav}
-            dark={dark}
-            onToggleDark={() => setDark((d) => !d)}
+            theme={theme}
+            dark={isDarkTheme(theme)}
+            onTheme={setTheme}
             onLibrary={() => setScreen("library")}
             onLoaded={onLoaded}
           />

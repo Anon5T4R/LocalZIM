@@ -28,6 +28,8 @@ import { LANG_NAMES, legName, guessLang } from "../lib/lang";
 import { pathFromHref, zimUrl } from "../lib/paths";
 import { t } from "../lib/i18n";
 import LocalePicker from "./LocalePicker";
+import ThemePicker from "./ThemePicker";
+import { type Theme } from "../lib/theme";
 
 export interface NavTarget {
   id: string;
@@ -38,8 +40,10 @@ export interface NavTarget {
 interface Props {
   active: ZimInfo;
   nav: NavTarget | null;
+  theme: Theme;
+  /** Modo escuro derivado do tema — é só isso que o artigo (iframe) recebe. */
   dark: boolean;
-  onToggleDark: () => void;
+  onTheme: (theme: Theme) => void;
   onLibrary: () => void;
   onLoaded: (id: string, path: string, title: string) => void;
 }
@@ -61,7 +65,7 @@ function urlHost(url: string): string {
   }
 }
 
-export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onLoaded }: Props) {
+export default function Reader({ active, nav, theme, dark, onTheme, onLibrary, onLoaded }: Props) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [title, setTitle] = useState("");
   const [zoom, setZoom] = useState(100);
@@ -583,9 +587,7 @@ export default function Reader({ active, nav, dark, onToggleDark, onLibrary, onL
         >
           🌐
         </button>
-        <button className="tb" onClick={onToggleDark} title={t("rd.themeTitle")}>
-          {dark ? "☀️" : "🌙"}
-        </button>
+        <ThemePicker theme={theme} onTheme={onTheme} className="tb-lang" />
         <LocalePicker className="tb-lang" />
 
         <div className="crumb" title={title}>

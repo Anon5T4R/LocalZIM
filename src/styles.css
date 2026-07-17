@@ -21,6 +21,68 @@
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
+/* ---------- temas nomeados (paleta fixa) ---------- */
+
+[data-theme="nature"] {
+  --bg: #f5f7f2;
+  --panel: #ffffff;
+  --text: #2e3a2e;
+  --muted: #6f7d6f;
+  --border: #e2e8dd;
+  --accent: #7a9e7e;
+  --accent-soft: #e6efe1;
+  --danger: #c0492f;
+  --shadow: 0 10px 30px rgba(60, 70, 60, 0.14);
+}
+
+[data-theme="darkblue"] {
+  --bg: #0d1520;
+  --panel: #131f30;
+  --text: #e2e8f0;
+  --muted: #8595ad;
+  --border: #223049;
+  --accent: #3b82f6;
+  --accent-soft: #1e3a5f;
+  --danger: #f87171;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+[data-theme="calmgreen"] {
+  --bg: #f2f5f1;
+  --panel: #ffffff;
+  --text: #24302a;
+  --muted: #6a7a6f;
+  --border: #dde6dc;
+  --accent: #4f7d5e;
+  --accent-soft: #dcebd9;
+  --danger: #c0492f;
+  --shadow: 0 10px 30px rgba(60, 70, 60, 0.14);
+}
+
+[data-theme="pastelpink"] {
+  --bg: #fdf4f7;
+  --panel: #ffffff;
+  --text: #3a2a30;
+  --muted: #8a7580;
+  --border: #f2dfe7;
+  --accent: #e8799f;
+  --accent-soft: #fbe4ee;
+  --danger: #d84a6b;
+  --shadow: 0 10px 30px rgba(60, 70, 60, 0.14);
+}
+
+[data-theme="punkprincess"] {
+  --bg: #120a1a;
+  --panel: #1a0f26;
+  --text: #f0e6ff;
+  --muted: #9a86b5;
+  --border: #2c1c3d;
+  --accent: #ff2d95;
+  --accent-soft: #33143a;
+  --danger: #ff5470;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
 * {
   box-sizing: border-box;
 }
@@ -399,7 +461,10 @@ button:disabled {
   background: #fff;
 }
 
-[data-theme="dark"] .content {
+/* fundo do iframe enquanto o artigo carrega — segue o modo claro/escuro do tema */
+[data-theme="dark"] .content,
+[data-theme="darkblue"] .content,
+[data-theme="punkprincess"] .content {
   background: #111;
 }
 

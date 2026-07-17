@@ -102,7 +102,7 @@ const pt = {
   "rd.zoomIn": "Aumentar zoom (Ctrl+=)",
   "rd.findTitle": "Localizar na página (Ctrl+F)",
   "rd.translateTitle": "Traduzir página (offline)",
-  "rd.themeTitle": "Alternar tema claro/escuro",
+  "rd.themeTitle": "Tema",
   "rd.searchFt": 'Buscar “{q}” no texto completo',
   "rd.iframeTitle": "Conteúdo do arquivo ZIM",
 
@@ -158,6 +158,15 @@ const pt = {
   "ft.indexFail": "Falha na indexação — tente de novo.",
   "ft.searching": "Buscando…",
   "ft.nothing": "Nada encontrado.",
+
+  // Temas
+  "theme.light": "Claro",
+  "theme.dark": "Escuro",
+  "theme.nature": "Natureza",
+  "theme.darkblue": "Azul escuro",
+  "theme.calmgreen": "Verde calmo",
+  "theme.pastelpink": "Rosa pastel",
+  "theme.punkprincess": "PunkPrincess",
 
   // Idioma
   "lang.title": "Idioma",
@@ -239,7 +248,7 @@ const en: Record<MessageKey, string> = {
   "rd.zoomIn": "Zoom in (Ctrl+=)",
   "rd.findTitle": "Find on page (Ctrl+F)",
   "rd.translateTitle": "Translate page (offline)",
-  "rd.themeTitle": "Toggle light/dark theme",
+  "rd.themeTitle": "Theme",
   "rd.searchFt": 'Search “{q}” in the full text',
   "rd.iframeTitle": "ZIM file content",
 
@@ -290,6 +299,14 @@ const en: Record<MessageKey, string> = {
   "ft.indexFail": "Indexing failed — try again.",
   "ft.searching": "Searching…",
   "ft.nothing": "Nothing found.",
+
+  "theme.light": "Light",
+  "theme.dark": "Dark",
+  "theme.nature": "Nature",
+  "theme.darkblue": "Dark blue",
+  "theme.calmgreen": "Calm green",
+  "theme.pastelpink": "Pastel pink",
+  "theme.punkprincess": "PunkPrincess",
 
   "lang.title": "Language",
 };
@@ -368,7 +385,7 @@ const es: Record<MessageKey, string> = {
   "rd.zoomIn": "Aumentar zoom (Ctrl+=)",
   "rd.findTitle": "Buscar en la página (Ctrl+F)",
   "rd.translateTitle": "Traducir página (offline)",
-  "rd.themeTitle": "Alternar tema claro/oscuro",
+  "rd.themeTitle": "Tema",
   "rd.searchFt": 'Buscar “{q}” en el texto completo',
   "rd.iframeTitle": "Contenido del archivo ZIM",
 
@@ -419,6 +436,14 @@ const es: Record<MessageKey, string> = {
   "ft.indexFail": "Error en la indexación — inténtalo de nuevo.",
   "ft.searching": "Buscando…",
   "ft.nothing": "Nada encontrado.",
+
+  "theme.light": "Claro",
+  "theme.dark": "Oscuro",
+  "theme.nature": "Naturaleza",
+  "theme.darkblue": "Azul oscuro",
+  "theme.calmgreen": "Verde tranquilo",
+  "theme.pastelpink": "Rosa pastel",
+  "theme.punkprincess": "PunkPrincess",
 
   "lang.title": "Idioma",
 };
