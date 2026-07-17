@@ -1,21 +1,27 @@
+/* §2: o --panel deixa de ser #ffffff puro e vira um off-white tingido com o
+   matiz violeta do próprio --bg (o accent do app é #7c3aed); o --bg desce ~3 L*
+   e a borda acompanha, preservando a escada. Branco puro tem contraste máximo
+   contra tudo e roubava o foco do accent. */
 :root {
-  --bg: #f6f5f9;
-  --panel: #ffffff;
+  --bg: #edecf0;
+  --panel: #f9f8fc;
   --text: #1c1a24;
   --muted: #6b6878;
-  --border: #e2dfeb;
+  --border: #dad7e2;
   --accent: #7c3aed;
   --accent-soft: #ede9fe;
   --danger: #dc2626;
   --shadow: 0 1px 3px rgba(20, 10, 50, 0.08), 0 4px 16px rgba(20, 10, 50, 0.06);
 }
 
+/* §2: o quase-preto #16141d (L*6.9) sobe +5 L* mantendo o matiz violeta;
+   painel e borda sobem junto, preservando a escada. */
 [data-theme="dark"] {
-  --bg: #16141d;
-  --panel: #201d2a;
+  --bg: #201e27;
+  --panel: #2b2735;
   --text: #eceaf3;
   --muted: #9b97ab;
-  --border: #322e40;
+  --border: #3d394c;
   --accent: #a78bfa;
   --accent-soft: #2d2542;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.3);
@@ -24,11 +30,11 @@
 /* ---------- temas nomeados (paleta fixa) ---------- */
 
 [data-theme="nature"] {
-  --bg: #f5f7f2;
-  --panel: #ffffff;
+  --bg: #eef1e9;
+  --panel: #f8faf5;
   --text: #2e3a2e;
-  --muted: #6f7d6f;
-  --border: #e2e8dd;
+  --muted: #697669;
+  --border: #dbe3d4;
   --accent: #7a9e7e;
   --accent-soft: #e6efe1;
   --danger: #c0492f;
@@ -36,11 +42,11 @@
 }
 
 [data-theme="darkblue"] {
-  --bg: #0d1520;
-  --panel: #131f30;
+  --bg: #16202e;
+  --panel: #1d2a3c;
   --text: #e2e8f0;
   --muted: #8595ad;
-  --border: #223049;
+  --border: #2d3f59;
   --accent: #3b82f6;
   --accent-soft: #1e3a5f;
   --danger: #f87171;
@@ -48,11 +54,11 @@
 }
 
 [data-theme="calmgreen"] {
-  --bg: #f2f5f1;
-  --panel: #ffffff;
+  --bg: #eaf0e9;
+  --panel: #f7faf6;
   --text: #24302a;
-  --muted: #6a7a6f;
-  --border: #dde6dc;
+  --muted: #67776c;
+  --border: #d5e0d3;
   --accent: #4f7d5e;
   --accent-soft: #dcebd9;
   --danger: #c0492f;
@@ -60,11 +66,11 @@
 }
 
 [data-theme="pastelpink"] {
-  --bg: #fdf4f7;
-  --panel: #ffffff;
+  --bg: #f8ebf0;
+  --panel: #fdf6f9;
   --text: #3a2a30;
-  --muted: #8a7580;
-  --border: #f2dfe7;
+  --muted: #806d77;
+  --border: #ecd3de;
   --accent: #e8799f;
   --accent-soft: #fbe4ee;
   --danger: #d84a6b;
@@ -72,11 +78,11 @@
 }
 
 [data-theme="punkprincess"] {
-  --bg: #120a1a;
-  --panel: #1a0f26;
+  --bg: #1c1228;
+  --panel: #251733;
   --text: #f0e6ff;
   --muted: #9a86b5;
-  --border: #2c1c3d;
+  --border: #3a2850;
   --accent: #ff2d95;
   --accent-soft: #33143a;
   --danger: #ff5470;
@@ -454,18 +460,18 @@ button:disabled {
   min-height: 0;
 }
 
+/* Fundo do iframe enquanto o artigo carrega. Era #fff fixo com um override
+   enumerando os temas escuros ([data-theme="dark"], darkblue, punkprincess) —
+   a mesma armadilha da lista de exclusão do §4: todo tema escuro novo nasceria
+   com um flash BRANCO aqui, e ninguém ia lembrar de vir editar esta lista.
+   O --panel já é a superfície certa em todos os 7 temas (claro nos claros,
+   escuro nos escuros) e agora não é mais branco puro — então a enumeração
+   inteira virou desnecessária. */
 .content {
   flex: 1;
   width: 100%;
   border: none;
-  background: #fff;
-}
-
-/* fundo do iframe enquanto o artigo carrega — segue o modo claro/escuro do tema */
-[data-theme="dark"] .content,
-[data-theme="darkblue"] .content,
-[data-theme="punkprincess"] .content {
-  background: #111;
+  background: var(--panel);
 }
 
 /* ---------- localizar na página ---------- */
