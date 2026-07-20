@@ -208,6 +208,26 @@ async fn fulltext_status(
     let file = get_book(&state, &id)?;
     let dir = ft_dir(&app, &file)?;
     if let Some(docs) = search::is_ready(&dir) {
+        // Cura a etiqueta que falta. Índice criado por versão anterior a esta
+        // não tem `source.json`, e sem ele o painel de armazenamento só sabe
+        // mostrar o uuid em hex — pra um usuário que já tinha índices, TODOS
+        // apareceriam sem nome. Escrever aqui faz a migração se resolver na
+        // primeira vez que o livro é aberto, em vez de exigir uma reindexação
+        // inteira (que custa minutos) só pra ganhar um rótulo.
+        if storage::read_label(&dir).is_none() {
+            let books = state.books.lock().unwrap();
+            if let Some(b) = books.get(&id) {
+                storage::write_label(
+                    &dir,
+                    &storage::Label {
+                        name: b.info.name.clone(),
+                        file_name: b.info.file_name.clone(),
+                        size: b.info.size,
+                        path: b.info.path.clone(),
+                    },
+                );
+            }
+        }
         return Ok(FtStatus {
             state: "ready".into(),
             progress: 1.0,
