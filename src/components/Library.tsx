@@ -13,6 +13,7 @@ import { formatBytes } from "../lib/paths";
 import { loadRecents, removeRecent, RecentBook } from "../lib/recents";
 import { t, localeTag } from "../lib/i18n";
 import LocalePicker from "./LocalePicker";
+import StoragePanel from "./StoragePanel";
 
 interface Props {
   books: ZimInfo[];
@@ -46,6 +47,7 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
   const [recents, setRecents] = useState<RecentBook[]>(loadRecents);
 
   // criador de .zim a partir de pasta
+  const [storageOpen, setStorageOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [cSource, setCSource] = useState("");
   const [cOutput, setCOutput] = useState("");
@@ -212,6 +214,13 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
             title={t("lib.createSiteTitle")}
           >
             {t("lib.createSite")}
+          </button>
+          <button
+            className="secondary"
+            onClick={() => setStorageOpen(true)}
+            title={t("storage.title")}
+          >
+            {t("storage.open")}
           </button>
           <LocalePicker />
         </div>
@@ -534,6 +543,8 @@ export default function Library({ books, error, onOpenPath, onActivate, onCloseB
           </div>
         </div>
       )}
+
+      {storageOpen && <StoragePanel books={books} onClose={() => setStorageOpen(false)} />}
     </div>
   );
 }

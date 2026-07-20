@@ -6,6 +6,7 @@
 
 mod crawler;
 mod search;
+mod storage;
 mod translate;
 mod zim;
 mod zimwriter;
@@ -239,12 +240,34 @@ async fn fulltext_build(
     // índice antigo aberto (se houver) fica inválido
     state.ft_indexes.lock().unwrap().remove(&id);
     let dir = ft_dir(&app, &file)?;
+    // Etiqueta o índice com o ZIM que o gera. A pasta é nomeada pelo uuid, do
+    // qual não dá pra voltar ao livro — sem isto o painel de armazenamento não
+    // teria como dizer de quem é o índice nem reconhecer o arquivo depois que
+    // ele muda de pasta. Best-effort: falhar aqui não pode derrubar a
+    // indexação. Escrita ANTES do build porque o build começa apagando a pasta
+    // e a recriando; o write_label roda depois, no fim, junto do done.
+    let rotulo = {
+        let books = state.books.lock().unwrap();
+        books.get(&id).map(|b| storage::Label {
+            name: b.info.name.clone(),
+            file_name: b.info.file_name.clone(),
+            size: b.info.size,
+            path: b.info.path.clone(),
+        })
+    };
 
     std::thread::spawn(move || {
         let _ = app.emit("fulltext", json!({ "id": id, "state": "building", "progress": 0.0 }));
         let res = search::build(&file, &dir, &st, |p| {
             let _ = app.emit("fulltext", json!({ "id": id, "state": "building", "progress": p }));
         });
+        // Só etiqueta se o índice ficou pronto: pasta interrompida tem que
+        // permanecer no balde "incompleto", que é o de risco zero.
+        if res.is_ok() {
+            if let Some(l) = &rotulo {
+                storage::write_label(&dir, l);
+            }
+        }
         app.state::<AppState>().ft_builds.lock().unwrap().remove(&id);
         let payload = match res {
             Ok(docs) => json!({ "id": id, "state": "ready", "progress": 1.0, "docs": docs }),
@@ -884,7 +907,11 @@ pub fn run() {
             translate_cancel_download,
             translate_remove,
             translate_prepare,
-            translate_texts
+            translate_texts,
+            storage::storage_info,
+            storage::storage_clear_incomplete,
+            storage::storage_delete_index,
+            storage::storage_clear_translate_cache
         ])
         .run(tauri::generate_context!())
         .expect("erro ao iniciar o LocalZIM");

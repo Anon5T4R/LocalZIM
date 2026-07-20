@@ -23,7 +23,7 @@ use tantivy::{doc, Index, IndexWriter, TantivyDocument};
 
 const TOKENIZER: &str = "folding";
 const WRITER_HEAP: usize = 192 * 1024 * 1024;
-const DONE_FILE: &str = "localzim-done.json";
+pub const DONE_FILE: &str = "localzim-done.json";
 
 /// Estado compartilhado de uma indexação em andamento.
 pub struct FtBuild {

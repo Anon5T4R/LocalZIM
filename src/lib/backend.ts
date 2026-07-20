@@ -136,3 +136,48 @@ export const fulltextBuild = (id: string) => invoke<void>("fulltext_build", { id
 export const fulltextCancel = (id: string) => invoke<void>("fulltext_cancel", { id });
 export const fulltextSearch = (id: string, query: string, limit = 30) =>
   invoke<FtHit[]>("fulltext_search", { id, query, limit });
+
+// ---- Dados e armazenamento (B11) ----
+export interface IndexEntry {
+  /** Nome da pasta = uuid do ZIM; é a chave pra apagar. */
+  uuid: string;
+  /** Nome do livro (vazio = índice sem etiqueta, de versão anterior). */
+  name: string;
+  fileName: string;
+  bytes: number;
+  ready: boolean;
+  known: boolean;
+  labeled: boolean;
+}
+export interface StorageInfo {
+  dir: string;
+  fulltextBytes: number;
+  fulltextFiles: number;
+  indexes: IndexEntry[];
+  readyCount: number;
+  knownCount: number;
+  incompleteBytes: number;
+  incompleteCount: number;
+  unrecognizedBytes: number;
+  unrecognizedCount: number;
+  unlabeledCount: number;
+  modelsBytes: number;
+  modelsFiles: number;
+  cacheBytes: number;
+  cacheFiles: number;
+}
+export interface Freed {
+  files: number;
+  bytes: number;
+}
+/** `known` = os ZIMs que o usuário conhece (recentes + abertos); o Rust compara
+ *  NOME DE ARQUIVO + tamanho, nunca o caminho. */
+export interface KnownZim {
+  path: string;
+  size: number;
+}
+export const storageInfo = (known: KnownZim[]) => invoke<StorageInfo>("storage_info", { known });
+export const storageClearIncomplete = (known: KnownZim[]) =>
+  invoke<Freed>("storage_clear_incomplete", { known });
+export const storageDeleteIndex = (uuid: string) => invoke<Freed>("storage_delete_index", { uuid });
+export const storageClearTranslateCache = () => invoke<Freed>("storage_clear_translate_cache");

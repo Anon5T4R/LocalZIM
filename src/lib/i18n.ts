@@ -170,6 +170,50 @@ const pt = {
 
   // Idioma
   "lang.title": "Idioma",
+
+  // Dados e armazenamento (B11)
+  "storage.title": "Dados e armazenamento",
+  "storage.open": "Dados e armazenamento",
+  "storage.path": "Pasta de dados",
+  "storage.openFolder": "Abrir",
+  "storage.fulltext": "Índices de busca full-text",
+  "storage.fulltextCounts": "{n} índices · {ready} prontos · {known} de arquivos que você tem",
+  "storage.fulltextHint":
+    "indexar um arquivo grande leva minutos e produz centenas de MB. O índice fica guardado pra a busca ser instantânea da próxima vez — e continua guardado mesmo se o .zim sair do disco.",
+  "storage.incomplete": "Indexações interrompidas",
+  "storage.incompleteCounts": "{n} índices ({size})",
+  "storage.incompleteHint":
+    "índices que não chegaram ao fim (app fechado no meio). O app já os ignora e reindexa do zero, então apagar é risco zero.",
+  "storage.list": "Índices guardados",
+  "storage.listHint":
+    "cada linha diz de qual arquivo é o índice. Os marcados como “você tem este arquivo” estão nos seus recentes — apagar um deles só custa reindexar. Os outros podem ser de arquivos que saíram do disco OU de arquivos que você simplesmente não abre há tempo (a lista de recentes guarda 24): quem sabe é você, por isso a decisão é linha a linha.",
+  "storage.have": "você tem este arquivo",
+  "storage.notFound": "não está nos seus recentes",
+  "storage.incompleteTag": "interrompido",
+  "storage.noLabel":
+    "índice de uma versão anterior do app — não dá pra saber de qual arquivo é",
+  "storage.empty": "Nenhum índice guardado ainda.",
+  "storage.models": "Modelos de tradução",
+  "storage.modelsCounts": "{n} arquivos",
+  "storage.modelsHint":
+    "os modelos de tradução offline que você baixou. Eles se apagam na própria tela de tradução, e nenhum botão daqui encosta neles.",
+  "storage.cache": "Cache de tradução",
+  "storage.cacheCounts": "{n} arquivos",
+  "storage.cacheHint":
+    "trechos já traduzidos, guardados pra não retraduzir. Apagar só custa tempo na próxima tradução; os modelos ficam.",
+  "storage.clear": "Limpar",
+  "storage.delete": "Apagar",
+  "storage.confirmTitle": "Confirmar limpeza",
+  "storage.confirmIncomplete":
+    "Apagar os índices de indexações interrompidas? Nenhum índice pronto é tocado.",
+  "storage.confirmIndex":
+    "Apagar o índice de “{name}”? O arquivo .zim não é tocado — você só perde a busca full-text nele, e pode reindexar quando quiser (leva alguns minutos).",
+  "storage.confirmCache":
+    "Apagar o cache de tradução? Os modelos baixados ficam; só os trechos já traduzidos são refeitos quando precisar.",
+  "storage.confirmYes": "Sim, apagar",
+  "storage.freed": "Liberado {size} ({n} arquivos).",
+  "storage.nothing": "Nada pra limpar aqui.",
+  "storage.failed": "Falha na limpeza: {e}",
 } as const;
 
 export type MessageKey = keyof typeof pt;
@@ -309,6 +353,48 @@ const en: Record<MessageKey, string> = {
   "theme.punkprincess": "PunkPrincess",
 
   "lang.title": "Language",
+
+  "storage.title": "Data and storage",
+  "storage.open": "Data and storage",
+  "storage.path": "Data folder",
+  "storage.openFolder": "Open",
+  "storage.fulltext": "Full-text search indexes",
+  "storage.fulltextCounts": "{n} indexes · {ready} complete · {known} for files you have",
+  "storage.fulltextHint":
+    "indexing a large file takes minutes and produces hundreds of MB. The index is kept so search is instant next time — and it stays kept even if the .zim leaves your disk.",
+  "storage.incomplete": "Interrupted indexing",
+  "storage.incompleteCounts": "{n} indexes ({size})",
+  "storage.incompleteHint":
+    "indexes that never finished (app closed midway). The app already ignores them and reindexes from scratch, so deleting them is zero risk.",
+  "storage.list": "Stored indexes",
+  "storage.listHint":
+    "each row says which file the index belongs to. The ones marked “you have this file” are in your recents — deleting one only costs a reindex. The others may be for files that left your disk OR for files you simply have not opened in a while (recents keeps 24): you are the one who knows, which is why the decision is row by row.",
+  "storage.have": "you have this file",
+  "storage.notFound": "not in your recents",
+  "storage.incompleteTag": "interrupted",
+  "storage.noLabel": "index from an earlier version of the app — there is no way to tell which file it belongs to",
+  "storage.empty": "No stored indexes yet.",
+  "storage.models": "Translation models",
+  "storage.modelsCounts": "{n} files",
+  "storage.modelsHint":
+    "the offline translation models you downloaded. They are removed from the translation screen itself, and no button here touches them.",
+  "storage.cache": "Translation cache",
+  "storage.cacheCounts": "{n} files",
+  "storage.cacheHint":
+    "passages already translated, kept so they are not translated twice. Deleting only costs time on the next translation; the models stay.",
+  "storage.clear": "Clear",
+  "storage.delete": "Delete",
+  "storage.confirmTitle": "Confirm cleanup",
+  "storage.confirmIncomplete":
+    "Delete the indexes from interrupted indexing? No complete index is touched.",
+  "storage.confirmIndex":
+    "Delete the index for “{name}”? The .zim file is not touched — you only lose full-text search in it, and you can reindex whenever you want (it takes a few minutes).",
+  "storage.confirmCache":
+    "Delete the translation cache? Downloaded models stay; only already-translated passages are redone when needed.",
+  "storage.confirmYes": "Yes, delete",
+  "storage.freed": "Freed {size} ({n} files).",
+  "storage.nothing": "Nothing to clean up here.",
+  "storage.failed": "Cleanup failed: {e}",
 };
 
 const es: Record<MessageKey, string> = {
@@ -446,6 +532,48 @@ const es: Record<MessageKey, string> = {
   "theme.punkprincess": "PunkPrincess",
 
   "lang.title": "Idioma",
+
+  "storage.title": "Datos y almacenamiento",
+  "storage.open": "Datos y almacenamiento",
+  "storage.path": "Carpeta de datos",
+  "storage.openFolder": "Abrir",
+  "storage.fulltext": "Índices de búsqueda de texto completo",
+  "storage.fulltextCounts": "{n} índices · {ready} completos · {known} de archivos que tienes",
+  "storage.fulltextHint":
+    "indexar un archivo grande lleva minutos y produce cientos de MB. El índice se guarda para que la búsqueda sea instantánea la próxima vez — y sigue guardado aunque el .zim salga del disco.",
+  "storage.incomplete": "Indexaciones interrumpidas",
+  "storage.incompleteCounts": "{n} índices ({size})",
+  "storage.incompleteHint":
+    "índices que no llegaron al final (app cerrada a mitad). La app ya los ignora y reindexa desde cero, así que borrarlos es riesgo cero.",
+  "storage.list": "Índices guardados",
+  "storage.listHint":
+    "cada fila dice de qué archivo es el índice. Los marcados como «tienes este archivo» están en tus recientes — borrar uno solo cuesta reindexar. Los demás pueden ser de archivos que salieron del disco O de archivos que simplemente no abres hace tiempo (recientes guarda 24): quien lo sabe eres tú, por eso la decisión es fila por fila.",
+  "storage.have": "tienes este archivo",
+  "storage.notFound": "no está en tus recientes",
+  "storage.incompleteTag": "interrumpido",
+  "storage.noLabel": "índice de una versión anterior de la app — no hay forma de saber de qué archivo es",
+  "storage.empty": "Aún no hay índices guardados.",
+  "storage.models": "Modelos de traducción",
+  "storage.modelsCounts": "{n} archivos",
+  "storage.modelsHint":
+    "los modelos de traducción offline que descargaste. Se borran en la propia pantalla de traducción, y ningún botón de aquí los toca.",
+  "storage.cache": "Caché de traducción",
+  "storage.cacheCounts": "{n} archivos",
+  "storage.cacheHint":
+    "fragmentos ya traducidos, guardados para no traducirlos dos veces. Borrarlos solo cuesta tiempo en la próxima traducción; los modelos se quedan.",
+  "storage.clear": "Limpiar",
+  "storage.delete": "Borrar",
+  "storage.confirmTitle": "Confirmar limpieza",
+  "storage.confirmIncomplete":
+    "¿Borrar los índices de indexaciones interrumpidas? Ningún índice completo se toca.",
+  "storage.confirmIndex":
+    "¿Borrar el índice de «{name}»? El archivo .zim no se toca — solo pierdes la búsqueda de texto completo en él, y puedes reindexar cuando quieras (lleva unos minutos).",
+  "storage.confirmCache":
+    "¿Borrar la caché de traducción? Los modelos descargados se quedan; solo los fragmentos ya traducidos se rehacen cuando haga falta.",
+  "storage.confirmYes": "Sí, borrar",
+  "storage.freed": "Liberado {size} ({n} archivos).",
+  "storage.nothing": "Nada que limpiar aquí.",
+  "storage.failed": "Error en la limpieza: {e}",
 };
 
 const DICTS: Record<Locale, Record<MessageKey, string>> = { pt, en, es };
