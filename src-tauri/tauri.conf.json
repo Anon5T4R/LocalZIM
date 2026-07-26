@@ -36,7 +36,8 @@
         "ext": ["zim"],
         "name": "Arquivo ZIM",
         "description": "Biblioteca offline ZIM (Kiwix)",
-        "role": "Viewer"
+        "role": "Viewer",
+        "mimeType": "application/x-zim"
       }
     ],
     "icon": [
