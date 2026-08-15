@@ -2649,6 +2649,7 @@ dependencies = [
  "candle-core",
  "candle-nn",
  "candle-transformers",
+ "gtk",
  "lol_html",
  "md-5",
  "percent-encoding",
